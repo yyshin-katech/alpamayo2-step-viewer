@@ -5,7 +5,9 @@ NVIDIA **Alpamayo 2 Super**가 주행 장면 하나를 처리하는 과정을, �
 - **`walk/`** 는 모델을 한 번 추론하면서 단계별 중간 텐서를 safetensors로 저장합니다. 72 GB 체크포인트를 레이어 단위로 디스크에서 읽어 올리므로 GPU 메모리 10 GB로 돌아갑니다. 가중치는 체크포인트 바이트를 그대로 올리고, 스트리밍·캡처가 계산을 바꾸지 않는지는 작은 무작위 모델로 비트 단위 비교합니다(`walk/test_tiny.py`).
 - **`viewer/`** 는 저장한 텐서를 브라우저에서 한 단계씩 보여 줍니다. 카메라 패치 → 비전 인코더 → LLM 64층 프리필 → CoT 디코딩 → 행동 전문가의 플로 매칭 → 예측 궤적 순서입니다. 일반·세부 모드, 값을 누르면 저장된 비트와 이웃 값을 보여 주는 인스펙터, 층을 가로지르는 분석 서랍(11탭)이 있습니다.
 
-> **English summary.** A local, step-by-step viewer for NVIDIA Alpamayo 2 Super. You download the weights and one PhysicalAI-AV sample yourself, run the model once on your own GPU (10 GB is enough; the weights are streamed layer by layer), capture every intermediate, and browse them at `127.0.0.1`. This repository ships **code only**: no weights, no dataset files, no captures, screenshots, logs or results. The captures come from a dataset whose license forbids sharing it, so keep them on your own machine. The guides in `docs/` are in Korean.
+> 영어판은 `english` 브랜치에 있습니다. README와 안내 문서, 뷰어 화면 문구가 모두 영어이고, `git clone`에 `--branch english`를 붙여 받습니다.
+
+> **English summary.** A local, step-by-step viewer for NVIDIA Alpamayo 2 Super. You download the weights and one PhysicalAI-AV sample yourself, run the model once on your own GPU (10 GB is enough; the weights are streamed layer by layer), capture every intermediate, and browse them at `127.0.0.1`. This repository ships **code only**: no weights, no dataset files, no captures, screenshots, logs or results. The captures come from a dataset whose license forbids sharing it, so keep them on your own machine. The guides in `docs/` and the viewer's on-screen text are in Korean. **An English version is on the `english` branch** (README, guides and viewer; add `--branch english` to `git clone`).
 
 ## 들어 있는 것과 없는 것
 
