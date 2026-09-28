@@ -6,9 +6,9 @@
 
 const AN = (() => {
   const { h, esc } = U;
-  const TABS = [["dist", "분포"], ["chan", "채널"], ["tok", "토큰"], ["massive", "거대 활성"], ["sqnr", "양자화 SQNR"], ["pca", "PCA"],
-    ["attn", "비전 어텐션"], ["lens", "로짓 렌즈"], ["vlens", "v-렌즈 (추정)"], ["check", "검증"], ["tensor", "텐서"]];
-  const DOMS = [["vis", "비전"], ["llm", "LLM"], ["exp", "행동 전문가"]];
+  const TABS = [["dist", "Distribution"], ["chan", "Channels"], ["tok", "Tokens"], ["massive", "Massive activations"], ["sqnr", "Quantization SQNR"], ["pca", "PCA"],
+    ["attn", "Vision attention"], ["lens", "Logit lens"], ["vlens", "v-lens (estimate)"], ["check", "Checks"], ["tensor", "Tensors"]];
+  const DOMS = [["vis", "Vision"], ["llm", "LLM"], ["exp", "Action expert"]];
   const REG = {};
 
   // ================================================================ state (per viewer, localStorage "aw.an")
@@ -50,12 +50,12 @@ const AN = (() => {
     root = el;
     hooks = o;
     root.innerHTML = "";
-    const handle = h("div", { class: "handle", title: "끌어서 높이 조절" });
+    const handle = h("div", { class: "handle", title: "Drag to resize" });
     tabSeg = h("div", { class: "seg dr-tabs" });
     const head = h("div", { class: "dr-h" },
-      h("h3", {}, "분석 도구"), tabSeg,
-      U.button("현재 단계로", () => { fromStep(hooks.cur ? hooks.cur() : null); save(); render(); }, "small ghost", "지금 보고 있는 단계의 층·스텝으로 맞춥니다"),
-      U.button("✕", close, "small ghost", "닫기 (Esc)"));
+      h("h3", {}, "Analysis tools"), tabSeg,
+      U.button("Match current step", () => { fromStep(hooks.cur ? hooks.cur() : null); save(); render(); }, "small ghost", "Set the layer and flow step to the step you are viewing now"),
+      U.button("✕", close, "small ghost", "Close (Esc)"));
     body = h("div", { class: "dr-b" });
     inner = h("div", { class: "dr-in" });
     body.appendChild(inner);
@@ -173,7 +173,7 @@ const AN = (() => {
     const ctx = mkCtx();
     inner.innerHTML = "";
     const def = REG[AS.tab];
-    if (!def) { inner.appendChild(U.note(`탭 ${esc(AS.tab)} 없음`)); return; }
+    if (!def) { inner.appendChild(U.note(`Tab ${esc(AS.tab)} not found`)); return; }
     try {
       const r = def.render(inner, ctx, AS);
       if (r && r.catch) r.catch((e) => { if (e !== SG.STALE && ctx.alive()) inner.appendChild(U.err(e)); });
@@ -211,7 +211,7 @@ const AN = (() => {
     if (dom === "llm") return AX().lstage(s);
     return AX().estage(s);
   }
-  const stepName = (k) => `플로 스텝 ${k} (t = ${ST.fmt(k / 10, 2)})`;
+  const stepName = (k) => `Flow step ${k} (t = ${ST.fmt(k / 10, 2)})`;
   const domName = (dom) => (DOMS.find(([d]) => d === dom) || [dom, dom])[1];
   const domColor = (dom) => Charts.css(dom === "vis" ? "--vis" : dom === "llm" ? "--llm" : "--exp") || "#888";
 
@@ -221,9 +221,9 @@ const AN = (() => {
   /** Stage slider for a domain (plus the flow-step slider for the expert). */
   function stagePick(dom, rr = rerender, o = {}) {
     const box = h("div", { class: "ctl" });
-    if (dom === "exp" && !o.noStep) box.appendChild(U.slider(0, 9, AS.eStep, (v, fin) => { if (fin) { AS.eStep = v; rr(); } }, { label: "플로 스텝", fmt: (v) => `${v} (t = ${ST.fmt(v / 10, 2)})` }));
+    if (dom === "exp" && !o.noStep) box.appendChild(U.slider(0, 9, AS.eStep, (v, fin) => { if (fin) { AS.eStep = v; rr(); } }, { label: "Flow step", fmt: (v) => `${v} (t = ${ST.fmt(v / 10, 2)})` }));
     if (!o.noStage) box.appendChild(U.slider(0, nStages(dom) - 1, stageOf(dom), (v, fin) => { if (fin) { setStage(dom, v); rr(); } },
-      { label: "단계", fmt: (v) => stageName(dom, v), cls: "wide-sl" }));
+      { label: "Stage", fmt: (v) => stageName(dom, v), cls: "wide-sl" }));
     return box;
   }
   function tools(parent, ...kids) { const t = h("div", { class: "row-tools" }, kids); parent.appendChild(t); return t; }
@@ -292,9 +292,9 @@ const AN = (() => {
   async function stageStats(ctx, dom) {
     if (dom === "exp") {
       const E = await expStats(ctx, AS.eStep), sh = (d) => [65, d];
-      const nm = `raw/expert/step_${SG.pad2(AS.eStep)} (브라우저 계산)`;
+      const nm = `raw/expert/step_${SG.pad2(AS.eStep)} (computed in the browser)`;
       return {
-        ...E, src: nm, rowName: "웨이포인트", rowLabel: (i) => AX().wp(i),
+        ...E, src: nm, rowName: "Waypoint", rowLabel: (i) => AX().wp(i),
         T: {
           hist: synth("hist", "F64", sh(64), E.hist), lhist: synth("lhist", "F64", sh(64), E.lhist), mom: synth("mom", "F64", sh(5), E.mom),
           absmax: synth("absmax", "F32", [65], E.absmax), chAbs: synth("ch_absmax", "F32", sh(1536), E.chAbs), chRms: synth("ch_rms", "F32", sh(1536), E.chRms),
@@ -307,7 +307,7 @@ const AN = (() => {
     const [hi, lh, mo, am, mt, mc, mv] = await Promise.all(keys.map((k) => ctx.read(url, k)));
     const nS = dom === "vis" ? 29 : 65, C = dom === "vis" ? 1152 : 5120;
     return {
-      nS, C, R: dom === "vis" ? 17280 : 4579, url, src: D.short(url), rowName: dom === "vis" ? "패치 행" : "위치",
+      nS, C, R: dom === "vis" ? 17280 : 4579, url, src: D.short(url), rowName: dom === "vis" ? "Patch row" : "Position",
       rowLabel: dom === "vis" ? (i) => AX().vrow(i) : (i) => D.posLabel(i),
       hist: hi.data, lhist: lh.data, mom: mo.data, absmax: am.data, mTok: mt.data, mCh: mc.data, mVal: mv.data,
       T: { hist: hi, lhist: lh, mom: mo, absmax: am, mVal: mv, mTok: mt, mCh: mc },

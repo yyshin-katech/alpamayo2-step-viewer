@@ -23,12 +23,12 @@
 
   // ================================================================ theme
   const THEMES = ["auto", "light", "dark"];
-  const THEME_LABEL = { auto: "◐ 자동", light: "☀ 밝게", dark: "☾ 어둡게" };
+  const THEME_LABEL = { auto: "◐ Auto", light: "☀ Light", dark: "☾ Dark" };
   function theme() { try { const t = localStorage.getItem("aw.theme"); return THEMES.includes(t) ? t : "auto"; } catch { return "auto"; } }
   function applyTheme(t) {
     if (t === "auto") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = t;
-    if (els.theme) { els.theme.textContent = THEME_LABEL[t]; els.theme.title = "테마 바꾸기 (자동 → 밝게 → 어둡게)"; }
+    if (els.theme) { els.theme.textContent = THEME_LABEL[t]; els.theme.title = "Change theme (Auto → Light → Dark)"; }
   }
   function cycleTheme() {
     const t = THEMES[(THEMES.indexOf(theme()) + 1) % THEMES.length];
@@ -145,10 +145,10 @@
   }
 
   function buildHeader() {
-    els.prev = U.button("◀ 이전", () => step(-1), "", "이전 단계 (←)");
-    els.next = U.button("다음 단계 ▶", () => step(1), "primary", "다음 단계 (→)");
+    els.prev = U.button("◀ Prev", () => step(-1), "", "Previous step (←)");
+    els.next = U.button("Next step ▶", () => step(1), "primary", "Next step (→)");
     els.ctr = h("span", { class: "ctr mono" });
-    els.scrub = h("input", { type: "range", min: 0, max: 1, value: 0, class: "scrub", "aria-label": "단계 이동" });
+    els.scrub = h("input", { type: "range", min: 0, max: 1, value: 0, class: "scrub", "aria-label": "Step navigation" });
     els.scrubTip = h("span", { class: "scrub-tip" });
     els.scrub.oninput = () => {
       const k = +els.scrub.value;
@@ -157,24 +157,24 @@
       els.scrubTip.classList.add("on");
     };
     els.scrub.onchange = () => { els.scrubTip.classList.remove("on"); nav(+els.scrub.value); };
-    els.jump = h("select", { class: "jump", title: "단계로 바로 가기" });
+    els.jump = h("select", { class: "jump", title: "Jump to a step" });
     els.jump.onchange = () => nav(+els.jump.value);
     els.nav.append(els.prev, els.ctr, els.next, h("span", { class: "scrub-w" }, els.scrub, els.scrubTip), els.jump);
 
     els.detail = h("span", { class: "detail-w" });
-    els.drawerBtn = U.button("분석 도구", () => AN.toggle(), "", "분석 도구 열기/닫기 (A)");
+    els.drawerBtn = U.button("Analysis tools", () => AN.toggle(), "", "Open/close analysis tools (A)");
     els.theme = U.button("", cycleTheme, "small ghost");
-    els.act = h("span", { class: "act mono small muted", title: "HTTP Range로 읽는 중인 구간 수 · 브라우저에 캐시된 텐서 바이트" });
+    els.act = h("span", { class: "act mono small muted", title: "Ranges being read over HTTP Range · tensor bytes cached in the browser" });
     els.tools.append(els.detail, els.drawerBtn,
       ...SG.LINKS.map((l) => h("a", { href: l.href, target: "_blank", rel: "noopener", class: "ext", title: l.title }, `${l.label} ↗`)),
-      U.button("?", showHelp, "small ghost", "사용법과 단축키"), els.theme, els.act);
+      U.button("?", showHelp, "small ghost", "How to use and shortcuts"), els.theme, els.act);
     applyTheme(theme());
 
     let actT = 0, last = [0, 0];
     const paint = () => {
       actT = 0;
       const [n, c] = last;
-      els.act.textContent = n > 0 ? `읽는 중 ${n}` : `캐시 ${ST.bytes(c)}`;
+      els.act.textContent = n > 0 ? `reading ${n}` : `cached ${ST.bytes(c)}`;
       els.act.classList.toggle("busy", n > 0);
     };
     ST.onActivity((n, c) => { last = [n, c]; if (!actT) actT = setTimeout(paint, 80); });
@@ -196,14 +196,14 @@
     }
 
     els.detail.innerHTML = "";
-    els.detail.appendChild(U.seg([[false, `보통 ${SG.steps(false).length}`, "레이어마다 한 단계 (세부는 단계 안에서 고름)"],
-      [true, `세부 ${SG.steps(true).length}`, "비전 블록·LLM 레이어를 다섯 부분으로 나눠 한 단계씩"]], detail, setDetail, "small"));
+    els.detail.appendChild(U.seg([[false, `Normal ${SG.steps(false).length}`, "One step per layer (parts are picked inside the step)"],
+      [true, `Detailed ${SG.steps(true).length}`, "Split each vision block and LLM layer into five parts, one step each"]], detail, setDetail, "small"));
 
     els.groups.innerHTML = "";
     for (const r of R) {
       const n = r.b - r.a + 1;
       const b = h("button", { type: "button", class: "gb", style: { "--gc": r.g.color, flexGrow: String(Math.max(1, Math.sqrt(n))) },
-        title: `${r.g.name}: 단계 ${r.a + 1}–${r.b + 1}` }, h("b", {}, r.g.name), h("span", { class: "gb-n" }, `${n}`));
+        title: `${r.g.name}: steps ${r.a + 1}–${r.b + 1}` }, h("b", {}, r.g.name), h("span", { class: "gb-n" }, `${n}`));
       b.onclick = () => nav(r.a);
       b.dataset.a = r.a; b.dataset.b = r.b;
       els.groups.appendChild(b);
@@ -218,25 +218,25 @@
     els.prev.disabled = cur <= 0;
     els.next.disabled = cur >= N - 1;
     const nx = list[cur + 1];
-    els.next.title = nx ? `다음: ${SG.title(nx)} (→)` : "마지막 단계";
+    els.next.title = nx ? `Next: ${SG.title(nx)} (→)` : "Last step";
     for (const b of els.groups.children) {
       const on = cur >= +b.dataset.a && cur <= +b.dataset.b;
       b.classList.toggle("on", on);
       b.style.setProperty("--p", on ? String((cur - +b.dataset.a + 1) / (+b.dataset.b - +b.dataset.a + 1)) : "0");
     }
-    document.title = `${SG.title(st)} · Alpamayo 2 단계 뷰어`;
+    document.title = `${SG.title(st)} · Alpamayo 2 Step Viewer`;
   }
 
   function showHelp() {
-    Insp.html("사용법", h("div", { class: "prose", html: [
-      "<p>노트북 샘플 0(clip <span class='mono'>030c760c…</span>, t0 = 5.1 s)을 Alpamayo 2 Super가 처리하는 과정을 캡처한 값으로 한 단계씩 따라갑니다. " +
-        "실시간 추론이 아니라 저장된 텐서를 필요한 구간만 HTTP Range로 읽어 보여 줍니다.</p>",
-      "<p><b>다음 단계 ▶</b>(또는 →)를 누르면 입력 → 비전 인코더(패치 → +pos → 블록 27개 → 병합기 → 딥스택) → LLM 프리필 64층 → CoT 디코드 → 행동 전문가 플로 10스텝 → 결과 순서로 진행합니다. " +
-        "<b>세부</b> 목록에서는 블록·레이어마다 다섯 부분을 한 단계씩 봅니다.</p>",
-      "<p>차트·표·칩의 값을 누르면 오른쪽 <b>인스펙터</b>에 저장된 비트, 인덱스의 의미, 이웃 값, 속한 행 통계가 나옵니다. 텐서 이름을 누르면 텐서 전체를 창 단위로 엽니다.</p>",
-      "<p><b>분석 도구</b>(A)는 층을 가로지르는 분포·채널·토큰·거대 활성·양자화 SQNR·PCA·비전 어텐션·로짓 렌즈·v-렌즈(추정)·검증·텐서 탐색을 제공합니다.</p>",
-      "<p>단축키: ← / → 이전·다음 단계 · A 분석 도구 · Esc 분석 도구 닫기.</p>",
-      "<p class='muted small'>값은 한 샘플(배치 1, 샘플 1개)의 캡처라 층·단계·방식 사이의 <b>상대 비교</b>로 읽어야 합니다. 추정으로 표시된 값(v-렌즈 등)은 모델이 직접 내놓은 값이 아닙니다.</p>",
+    Insp.html("How to use", h("div", { class: "prose", html: [
+      "<p>Follow, one step at a time, how Alpamayo 2 Super processes notebook sample 0 (clip <span class='mono'>030c760c…</span>, t0 = 5.1 s), using captured values. " +
+        "This is not live inference: the viewer reads only the parts of the saved tensors it needs over HTTP Range and shows them.</p>",
+      "<p>Press <b>Next step ▶</b> (or →) to go through input → vision encoder (patches → +pos → 27 blocks → merger → DeepStack) → LLM prefill (64 layers) → CoT decode → action expert (10 flow steps) → result. " +
+        "The <b>Detailed</b> list shows five parts of every block and layer, one step each.</p>",
+      "<p>Click a value in a chart, table or chip and the <b>inspector</b> on the right shows its stored bits, what its indices mean, neighboring values and the stats of its row. Click a tensor name to browse the whole tensor window by window.</p>",
+      "<p><b>Analysis tools</b> (A) cover cross-layer distributions, channels, tokens, massive activations, quantization SQNR, PCA, vision attention, logit lens, v-lens (estimate), checks and a tensor explorer.</p>",
+      "<p>Shortcuts: ← / → previous / next step · A analysis tools · Esc close analysis tools.</p>",
+      "<p class='muted small'>The values are a capture of one sample (batch 1, one trajectory sample), so read them as <b>relative comparisons</b> between layers, steps and methods. Values marked as estimates (v-lens and others) are not values the model produced directly.</p>",
     ].join("") }));
   }
 
@@ -272,7 +272,7 @@
 
   function fatal(html) {
     els.stageIn.innerHTML = "";
-    els.stageIn.appendChild(h("div", { class: "fatal" }, h("h2", {}, "뷰어를 시작하지 못했습니다"), h("div", { html })));
+    els.stageIn.appendChild(h("div", { class: "fatal" }, h("h2", {}, "The viewer could not start"), h("div", { html })));
   }
 
   // ================================================================ boot
@@ -281,16 +281,16 @@
       ["insp", "#insp"], ["drawer", "#drawer"]]) els[k] = $(s);
     applyTheme(theme());
     if (location.protocol === "file:") {
-      fatal("파일(file://)로 열면 텐서를 HTTP Range로 읽을 수 없습니다. 레포 폴더에서 로컬 서버를 띄워 여세요:" +
-        "<pre>python3 viewer/serve.py</pre>그다음 <span class='mono'>http://127.0.0.1:8765/viewer/index.html</span>");
+      fatal("Opened as a file (file://), the viewer cannot read tensors over HTTP Range. Start the local server in the repository folder and open the page from it:" +
+        "<pre>python3 viewer/serve.py</pre>Then open <span class='mono'>http://127.0.0.1:8765/viewer/index.html</span>");
       return;
     }
     try {
       await D.init();
     } catch (e) {
       console.error(e);
-      fatal(`캡처 목록 <span class="mono">/walk/out/derived/manifest.json</span>을 읽지 못했습니다: ${esc(e && e.message ? e.message : String(e))}<br>` +
-        "serve.py로 연 페이지인지, <span class='mono'>walk/out/derived</span>와 <span class='mono'>walk/out/raw</span>가 있는지 확인하세요.");
+      fatal(`Could not read the capture list <span class="mono">/walk/out/derived/manifest.json</span>: ${esc(e && e.message ? e.message : String(e))}<br>` +
+        "Check that the page was opened through serve.py and that <span class='mono'>walk/out/derived</span> and <span class='mono'>walk/out/raw</span> exist.");
       return;
     }
     D.vocab().catch(() => {});
@@ -427,7 +427,7 @@
         const b = root.querySelectorAll(".fr-name")[ni];
         if (!b) break;
         await act(`name${ni} “${b.textContent.slice(0, 24)}”`, () => b.click());
-        if (ni === 0) await poke(els.insp, `${where} › 인스펙터`, { segs: 3, perSeg: 2, selects: 2, sliders: 0, canvases: 2, names: 0 });
+        if (ni === 0) await poke(els.insp, `${where} › inspector`, { segs: 3, perSeg: 2, selects: 2, sliders: 0, canvases: 2, names: 0 });
       }
     }
 
@@ -505,7 +505,7 @@
           AN.open("check");
           await settle(els.drawer);
           const all = $("#rc-all");
-          if (!all) push(R.errors, "#rc-all 없음");
+          if (!all) push(R.errors, "#rc-all missing");
           else {
             all.click();
             const a = performance.now();

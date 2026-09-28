@@ -580,8 +580,8 @@ def part_expert() -> None:
     save_group(DER / "expert_stats.safetensors", o,
                {"stages": ["in_norm"] + [f"L{l:02d}" for l in range(64)],
                 "vlens": "action_out_proj(expert_norm(layer l output)) in bf16; layer 63 == the model's v",
-                "vlens_x1": "x_k + (1 - t_k) * vlens (추정: linear flow-path estimate of the clean action)",
-                "vlens_xyz": "vlens_x1 decoded with the model's own action_to_traj (추정)",
+                "vlens_x1": "x_k + (1 - t_k) * vlens (estimate: linear flow-path extrapolation of the clean action)",
+                "vlens_xyz": "vlens_x1 decoded with the model's own action_to_traj (estimate)",
                 "vlens_ade": "ADE / FDE of vlens_xyz against the GT future (xy), m"})
     log("expert done")
 

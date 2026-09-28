@@ -17,14 +17,14 @@ const SL = (() => {
   const axisColors = () => [llmColor(), Charts.css("--vis") || "#0E8486", Charts.css("--exp") || "#C8670C"];
   const gridColor = () => Charts.css("--grid") || "#ccc";
 
-  const DS_METRICS = [["ds_ratio", "‖Δ‖/‖h‖", "더한 양의 상대 크기 ‖after − before‖ / ‖before‖"], ["ds_norm", "‖Δ‖", "더한 양의 크기 ‖after − before‖"],
-    ["ds_cos", "cos(전, 후)", "더하기 전후의 방향 변화"], ["ds_feat_norm", "‖feat‖", "딥스택 특징(병합기 출력)의 노름"]];
-  const LTOK = [["tok_norm", "‖x‖", "토큰별 L2 노름"], ["tok_absmax", "max|x|", "토큰별 최대 |x|"], ["tok_kurt", "첨도", "채널 분포의 첨도 (가우시안 = 3)"],
-    ["tok_upd", "갱신 비율", "‖out − in‖ / ‖in‖ (레이어가 바꾼 양)"], ["tok_cos_in", "cos(in, out)", "레이어 입력과 출력의 코사인"]];
+  const DS_METRICS = [["ds_ratio", "‖Δ‖/‖h‖", "Relative size of the added amount ‖after − before‖ / ‖before‖"], ["ds_norm", "‖Δ‖", "Size of the added amount ‖after − before‖"],
+    ["ds_cos", "cos(before, after)", "Change in direction before and after the addition"], ["ds_feat_norm", "‖feat‖", "Norm of the DeepStack feature (merger output)"]];
+  const LTOK = [["tok_norm", "‖x‖", "L2 norm per token"], ["tok_absmax", "max|x|", "Max |x| per token"], ["tok_kurt", "Kurtosis", "Kurtosis of the channel distribution (Gaussian = 3)"],
+    ["tok_upd", "Update ratio", "‖out − in‖ / ‖in‖ (how much the layer changed)"], ["tok_cos_in", "cos(in, out)", "Cosine between layer input and output"]];
   const LTOK_LOG = { tok_norm: true, tok_absmax: true, tok_kurt: true, tok_upd: true, tok_cos_in: false };
 
-  const headName = (c) => `헤드 ${c >> 7} · d ${c & 127}`;
-  const kvName = (c) => `KV 헤드 ${c >> 7} · d ${c & 127}`;
+  const headName = (c) => `head ${c >> 7} · d ${c & 127}`;
+  const kvName = (c) => `KV head ${c >> 7} · d ${c & 127}`;
   /** Column separators: q/ctx every 1024 (one KV group of 8 heads), k/v every 128 (one head). */
   const qLines = () => Array.from({ length: 7 }, (_, i) => ({ c: 1024 * (i + 1), color: gridColor() }));
   const kvLines = () => Array.from({ length: 7 }, (_, i) => ({ c: 128 * (i + 1), color: gridColor() }));
@@ -64,7 +64,7 @@ const SL = (() => {
   /** Little strip of the 64 frequencies coloured by the axis they rotate with. */
   function axisStrip() {
     const C = axisColors();
-    return h("div", { class: "mrope-axes", title: "주파수 j = 0…63의 축 (d와 d+64가 같은 j)" },
+    return h("div", { class: "mrope-axes", title: "Axis of each frequency j = 0…63 (d and d+64 share the same j)" },
       Array.from({ length: 64 }, (_, j) => h("i", { style: { background: C[axisOf(j)] }, title: `j ${j} → ${AXIS[axisOf(j)]}` })));
   }
 
@@ -117,40 +117,40 @@ const SL = (() => {
     const x = new Float32Array(len), y = new Float32Array(len), ybits = new Uint16Array(len);
     let o = 0;
     for (const [a, b] of parts) { x.set(a.data, o); y.set(b.data, o); ybits.set(b.bits, o); o += a.data.length; }
-    return { x, y, ybits, rows, cols, rowDesc: `프리필 프로브 ${P().length}개 + 디코드 ${nS}스텝` + (cols === HD ? ", 행 = 토큰 × 헤드" : "") };
+    return { x, y, ybits, rows, cols, rowDesc: `${P().length} prefill probes + ${nS} decode steps` + (cols === HD ? ", rows = tokens × heads" : "") };
   }
-  const GAMMA_NOTE = "γ는 체크포인트 가중치이고 뷰어에는 싣지 않았습니다. 여기 값은 캡처한 입력·출력 쌍에서 거꾸로 맞춘 <b>추정</b>입니다.";
+  const GAMMA_NOTE = "γ is a checkpoint weight and is not included in the viewer. The values here are an <b>estimate</b> fitted backward from captured input/output pairs.";
   /** Card with a button that estimates γ of one RMSNorm. o: {title, sub, name, load: async () => normPairs(...), eps?, note?} */
   function gammaCard(parent, ctx, o) {
-    return SG.lazy(parent, ctx, `${o.title} <span class="muted">(γ 추정)</span>`, { sub: o.sub }, async (body) => {
+    return SG.lazy(parent, ctx, `${o.title} <span class="muted">(γ estimate)</span>`, { sub: o.sub }, async (body) => {
       const out = h("div");
-      const btn = U.button("γ 추정 실행", async () => {
-        btn.disabled = true; btn.textContent = "계산 중…";
+      const btn = U.button("Run γ estimate", async () => {
+        btn.disabled = true; btn.textContent = "Computing…";
         try {
           const d = await o.load();
           const est = gammaEst(d.x, d.y, d.ybits, d.rows, d.cols, o.eps);
           if (!ctx.alive()) return;
           btn.remove();
           drawGamma(out, est, d, o);
-        } catch (e) { if (e !== SG.STALE) { btn.disabled = false; btn.textContent = "다시 시도"; out.appendChild(U.err(e)); } }
+        } catch (e) { if (e !== SG.STALE) { btn.disabled = false; btn.textContent = "Retry"; out.appendChild(U.err(e)); } }
       }, "small");
       body.append(h("div", { class: "links" }, btn), out);
     });
   }
   function drawGamma(out, est, d, o) {
-    const gt = SG.bfTensor(`${o.name} γ (추정)`, [est.cols], est.w), NOTE = o.note || GAMMA_NOTE;
+    const gt = SG.bfTensor(`${o.name} γ (estimate)`, [est.cols], est.w), NOTE = o.note || GAMMA_NOTE;
     out.appendChild(U.kv([
-      ["원소 비트 일치", `${ST.fmt(est.total)} / ${ST.fmt(est.n)} (${U.pct(est.total / est.n, 3)})`],
-      ["모든 행이 맞는 채널", `${ST.fmt(est.full)} / ${ST.fmt(est.cols)}`],
-      ["사용한 행", `${ST.fmt(est.rows)} (${esc(d.rowDesc)})`],
+      ["Bit-exact elements", `${ST.fmt(est.total)} / ${ST.fmt(est.n)} (${U.pct(est.total / est.n, 3)})`],
+      ["Channels matching in every row", `${ST.fmt(est.full)} / ${ST.fmt(est.cols)}`],
+      ["Rows used", `${ST.fmt(est.rows)} (${esc(d.rowDesc)})`],
     ], "tight"));
     const cv = U.canvas();
     out.appendChild(cv);
-    Charts.line(cv, { W: U.width(out, 560), H: 180, series: [{ y: est.g, color: estColor(), width: 1, label: "γ (추정)" }], hline: 1, xlabel: "채널", ylabel: "γ",
-      legend: false, xname: (x) => `채널 ${x} · ${est.hitCol[x]}/${est.rows}행 일치`, onPick: (hv) => Insp.value(gt, hv.i, { note: NOTE }) });
+    Charts.line(cv, { W: U.width(out, 560), H: 180, series: [{ y: est.g, color: estColor(), width: 1, label: "γ (estimate)" }], hline: 1, xlabel: "channel", ylabel: "γ",
+      legend: false, xname: (x) => `channel ${x} · ${est.hitCol[x]}/${est.rows} rows match`, onPick: (hv) => Insp.value(gt, hv.i, { note: NOTE }) });
     const top = ST.topk(est.g, 8);
-    out.appendChild(h("div", { class: "small muted" }, "|γ|가 큰 채널"));
-    out.appendChild(U.table(["채널", "γ (추정)", "일치 행"], top.map((c) => [String(c), ST.fmt(est.g[c], 5), `${est.hitCol[c]}/${est.rows}`]),
+    out.appendChild(h("div", { class: "small muted" }, "Channels with the largest |γ|"));
+    out.appendChild(U.table(["Channel", "γ (estimate)", "Matching rows"], top.map((c) => [String(c), ST.fmt(est.g[c], 5), `${est.hitCol[c]}/${est.rows}`]),
       { cls: "small", onRow: (i) => Insp.value(gt, top[i], { note: NOTE }) }));
     out.appendChild(U.note(NOTE, "small caveat"));
   }
@@ -174,8 +174,8 @@ const SL = (() => {
   async function layerIn(ctx, l, pos) {
     if (l === 0) return { t: await ctx.read(D.F.lembed, "inputs_embeds", { rows: [pos, pos + 1] }), name: "inputs_embeds" };
     const im = D.imageOf(pos);
-    if (l <= 3 && im) return { t: await ctx.read(D.F.lds(l - 1), "image_rows_after", { rows: [im.row, im.row + 1] }), name: `딥스택 ${l - 1} 뒤 (image_rows_after)` };
-    return { t: await ctx.read(D.F.layer(l - 1), "out", { rows: [pos, pos + 1] }), name: `레이어 ${l - 1} 출력` };
+    if (l <= 3 && im) return { t: await ctx.read(D.F.lds(l - 1), "image_rows_after", { rows: [im.row, im.row + 1] }), name: `after DeepStack ${l - 1} (image_rows_after)` };
+    return { t: await ctx.read(D.F.layer(l - 1), "out", { rows: [pos, pos + 1] }), name: `layer ${l - 1} output` };
   }
   /** Internals of probe j in layer l ("out" is read by position). */
   async function readProbe(ctx, l, j, keys) {
@@ -235,24 +235,24 @@ const SL = (() => {
   }
   function posPicker(ctx) {
     const pos = ctx.sel.pos, n = PL() - 1, set = (v) => ctx.setSel("pos", Math.max(0, Math.min(n, v)));
-    return h("div", { class: "pick picker" }, h("span", { class: "muted small" }, "위치"),
-      U.button("◀", () => set(pos - 1), "small", "이전 위치"), U.button("▶", () => set(pos + 1), "small", "다음 위치"),
-      numInput(pos, n, `프롬프트 위치 (0–${n})`, set),
-      U.select([[-1, "프로브로 이동…"], ...Array.from(P(), (q, j) => [j, `${j}: ${D.posLabel(q)}`])], D.probeIndex(pos), (v) => { if (v >= 0) set(P()[v]); }),
+    return h("div", { class: "pick picker" }, h("span", { class: "muted small" }, "Position"),
+      U.button("◀", () => set(pos - 1), "small", "Previous position"), U.button("▶", () => set(pos + 1), "small", "Next position"),
+      numInput(pos, n, `Prompt position (0–${n})`, set),
+      U.select([[-1, "Go to probe…"], ...Array.from(P(), (q, j) => [j, `${j}: ${D.posLabel(q)}`])], D.probeIndex(pos), (v) => { if (v >= 0) set(P()[v]); }),
       h("span", { class: "small mono" }, D.posLabel(pos)));
   }
-  function probeBanner(ctx, what = "레이어 내부값") {
+  function probeBanner(ctx, what = "Layer internals") {
     const pos = ctx.sel.pos;
     if (D.probeIndex(pos) >= 0) return null;
     const q = P()[nearestProbe(pos)];
     return h("div", { class: "note caveat focal-note" },
-      h("span", { html: `${what}은 프로브 위치 22개에서만 캡처했습니다. 선택한 위치 #${pos}의 레이어 출력·어텐션 요약·렌즈·통계는 그대로 보이고, ` +
-        `내부값 칸은 가장 가까운 프로브 <b>${esc(D.posLabel(q))}</b>의 값입니다.` }),
-      U.button(`#${q}로 이동`, () => ctx.setSel("pos", q), "small"));
+      h("span", { html: `${what} were captured only at the 22 probe positions. Layer outputs, attention summaries, lenses and stats for the selected position #${pos} are shown as is, but ` +
+        `the internal values come from the nearest probe <b>${esc(D.posLabel(q))}</b>.` }),
+      U.button(`Go to #${q}`, () => ctx.setSel("pos", q), "small"));
   }
   function headPick(ctx, key = "lhead") {
-    return h("label", { class: "pick" }, h("span", { class: "muted small" }, "헤드"),
-      U.select([[-1, "헤드 평균"], ...Array.from({ length: NQ }, (_, x) => [x, `헤드 ${x} (KV ${x >> 3})`])], ctx.sel[key], (v) => ctx.setSel(key, v)));
+    return h("label", { class: "pick" }, h("span", { class: "muted small" }, "Head"),
+      U.select([[-1, "Head mean"], ...Array.from({ length: NQ }, (_, x) => [x, `Head ${x} (KV ${x >> 3})`])], ctx.sel[key], (v) => ctx.setSel(key, v)));
   }
 
   // ================================================================ attention helpers
@@ -272,14 +272,14 @@ const SL = (() => {
   }
   function attnKV(sm, extra = []) {
     return U.kv([
-      ["엔트로피 H", `${ST.fmt(sm.H, 4)} nat · e<sup>H</sup> ≈ 키 ${ST.fmt(sm.eH, 4)}개`],
-      ["싱크 (#0)", U.pct(sm.sink, 2)],
-      Number.isFinite(sm.self) ? ["자기 자신", U.pct(sm.self, 2)] : null,
-      ["이미지 24장", U.pct(sm.img, 2)],
-      ["텍스트", U.pct(sm.txt, 2)],
-      ["궤적 이력", U.pct(sm.hist, 2)],
-      sm.gen > 0 ? ["생성 토큰", U.pct(sm.gen, 2)] : null,
-      ["합 Σp", ST.fmt(sm.sum, 6)],
+      ["Entropy H", `${ST.fmt(sm.H, 4)} nat · e<sup>H</sup> ≈ ${ST.fmt(sm.eH, 4)} keys`],
+      ["Sink (#0)", U.pct(sm.sink, 2)],
+      Number.isFinite(sm.self) ? ["Self", U.pct(sm.self, 2)] : null,
+      ["24 images", U.pct(sm.img, 2)],
+      ["Text", U.pct(sm.txt, 2)],
+      ["Trajectory history", U.pct(sm.hist, 2)],
+      sm.gen > 0 ? ["Generated tokens", U.pct(sm.gen, 2)] : null,
+      ["Sum Σp", ST.fmt(sm.sum, 6)],
       ...extra,
     ], "tight");
   }
@@ -288,14 +288,14 @@ const SL = (() => {
     parent.appendChild(cv);
     const v = Array.from(bins).slice(0, 28);
     Charts.bars(cv, { W: U.width(parent, 480), H: o.H || 150, values: v, labels: v.map((_, b) => D.binShort(b)), colors: (b) => D.binColor(b),
-      ylabel: o.ylabel || "어텐션 질량", logy: o.logy, sel: o.sel, title: o.title,
+      ylabel: o.ylabel || "attention mass", logy: o.logy, sel: o.sel, title: o.title,
       onHover: (b) => `${esc(D.binName(b))}<br><b>${U.pct(v[b], 3)}</b>`, onPick: o.onPick });
     return cv;
   }
   /** Top-k keys of an attention row as a clickable table. */
   function topKeys(parent, row, n, o = {}) {
     const top = ST.topk(row.data.subarray(0, n), o.k || 10, false);
-    parent.appendChild(U.table(["키 위치", "p", ""], top.map((p) => [esc(D.posLabel(p)), ST.fmt(row.data[p], 4), p === o.self ? "자기 자신" : p === 0 ? "싱크" : ""]),
+    parent.appendChild(U.table(["Key position", "p", ""], top.map((p) => [esc(D.posLabel(p)), ST.fmt(row.data[p], 4), p === o.self ? "self" : p === 0 ? "sink" : ""]),
       { cls: "small", onRow: (i) => Insp.value(row, top[i], { label: o.label, links: o.links ? o.links(top[i]) : undefined }) }));
     return top;
   }
@@ -307,25 +307,25 @@ const SL = (() => {
     const row = (t, name, x = {}) => fr(body, t, name, { label: esc(`${o.lbl} · ${name}`), ...x });
     const see = (t) => (i) => Insp.value(t, i);
     row(T.in, o.inName, { badge: o.inBadge });
-    SG.arrow(body, "RMSNorm₁ (input_layernorm) — 행 RMS로 나누고 채널별 γ를 곱함");
+    SG.arrow(body, "RMSNorm₁ (input_layernorm) — divide by the row RMS and multiply by per-channel γ");
     row(T.ln1, "ln1");
-    SG.arrow(body, "q_proj · k_proj · v_proj — 5120 → 쿼리 64 × 128 · 키·값 8 × 128 (GQA)");
+    SG.arrow(body, "q_proj · k_proj · v_proj — 5120 → query 64 × 128 · key/value 8 × 128 (GQA)");
     row(T.q, "q", { colName: headName, vlines: qLines() });
     row(T.k, "k", { colName: kvName, vlines: kvLines() });
     row(T.v, "v", { colName: kvName, vlines: kvLines() });
-    SG.arrow(body, "q_norm · k_norm — 헤드마다 128차원 RMSNorm (QK-norm)");
+    SG.arrow(body, "q_norm · k_norm — 128-dim RMSNorm per head (QK-norm)");
     row(T.qn, "qn", { colName: headName, vlines: qLines() });
     row(T.kn, "kn", { colName: kvName, vlines: kvLines() });
-    SG.arrow(body, "M-RoPE — (d, d+64) 쌍을 위치 (t, h, w)의 각도만큼 회전");
+    SG.arrow(body, "M-RoPE — rotate each (d, d+64) pair by the angle of position (t, h, w)");
     const rq = ropeRow(T.qn, o.cos, o.sin, NQ, "RoPE(qn)"), rk = ropeRow(T.kn, o.cos, o.sin, NKV, "RoPE(kn)");
-    row(T.qr, "qr", { colName: headName, vlines: qLines(), badge: SG.cmpBadge(SG.cmp(rq, T.qr), "RoPE 재계산", { formula: ROPE_F, open: see(T.qr) }) });
-    row(T.kr, "kr", { colName: kvName, vlines: kvLines(), badge: SG.cmpBadge(SG.cmp(rk, T.kr), "RoPE 재계산", { formula: ROPE_F, open: see(T.kr) }) });
-    SG.arrow(body, `SDPA — softmax(q·kᵀ/√128)·v, 인과 마스크, 쿼리 헤드 8개가 KV 헤드 1개를 공유 · 키 ${ST.fmt(o.keys)}개`);
+    row(T.qr, "qr", { colName: headName, vlines: qLines(), badge: SG.cmpBadge(SG.cmp(rq, T.qr), "RoPE recompute", { formula: ROPE_F, open: see(T.qr) }) });
+    row(T.kr, "kr", { colName: kvName, vlines: kvLines(), badge: SG.cmpBadge(SG.cmp(rk, T.kr), "RoPE recompute", { formula: ROPE_F, open: see(T.kr) }) });
+    SG.arrow(body, `SDPA — softmax(q·kᵀ/√128)·v, causal mask, 8 query heads share 1 KV head · ${ST.fmt(o.keys)} keys`);
     row(T.ctx, "ctx", { colName: headName, vlines: qLines() });
     SG.arrow(body, "o_proj — 64 × 128 → 5120");
     row(T.o, "o");
-    SG.arrow(body, "+ 잔차 (레이어 입력)");
-    row(T.mid, "mid", { badge: SG.cmpBadge(SG.cmp(SG.bfTensor("in + o", [1, HID], SV.addWords(T.in.data, T.o.data)), T.mid), "잔차 재계산", { formula: "bf16( fp32(in) + fp32(o) )", open: see(T.mid) }) });
+    SG.arrow(body, "+ residual (layer input)");
+    row(T.mid, "mid", { badge: SG.cmpBadge(SG.cmp(SG.bfTensor("in + o", [1, HID], SV.addWords(T.in.data, T.o.data)), T.mid), "Residual recompute", { formula: "bf16( fp32(in) + fp32(o) )", open: see(T.mid) }) });
     SG.arrow(body, "RMSNorm₂ (post_attention_layernorm)");
     row(T.ln2, "ln2");
     SG.arrow(body, "gate_proj · up_proj — 5120 → 25600");
@@ -334,21 +334,21 @@ const SL = (() => {
     SG.arrow(body, "SiLU(gate) = gate · σ(gate)");
     const wa = new Uint16Array(FF), wd = new Uint16Array(FF);
     for (let i = 0; i < FF; i++) { wa[i] = ST.bf16Round(R.silu(T.gate.data[i])); wd[i] = ST.bf16Round(R.f32(T.act.data[i] * T.up.data[i])); }
-    row(T.act, "act", { badge: SG.cmpBadge(SG.cmp(SG.bfTensor("silu(gate)", [1, FF], wa), T.act), "SiLU 재계산", { approx: true, formula: "bf16( gate / (1 + exp(−gate)) ) (fp32)",
-      note: "exp 구현(CUDA vs JavaScript)이 달라 bf16 경계 근처 값이 1 ulp씩 갈릴 수 있습니다.", open: see(T.act) }) });
-    SG.arrow(body, "× up (원소별 곱)");
-    row(T.down_in, "down_in", { badge: SG.cmpBadge(SG.cmp(SG.bfTensor("act · up", [1, FF], wd), T.down_in), "곱 재계산", { formula: "bf16( fp32(act) · fp32(up) )", open: see(T.down_in) }) });
+    row(T.act, "act", { badge: SG.cmpBadge(SG.cmp(SG.bfTensor("silu(gate)", [1, FF], wa), T.act), "SiLU recompute", { approx: true, formula: "bf16( gate / (1 + exp(−gate)) ) (fp32)",
+      note: "The exp implementations (CUDA vs JavaScript) differ, so values near a bf16 rounding boundary can differ by 1 ulp.", open: see(T.act) }) });
+    SG.arrow(body, "× up (elementwise product)");
+    row(T.down_in, "down_in", { badge: SG.cmpBadge(SG.cmp(SG.bfTensor("act · up", [1, FF], wd), T.down_in), "Product recompute", { formula: "bf16( fp32(act) · fp32(up) )", open: see(T.down_in) }) });
     SG.arrow(body, "down_proj — 25600 → 5120");
     row(T.down, "down");
-    SG.arrow(body, "+ 잔차 (mid)");
+    SG.arrow(body, "+ residual (mid)");
     row(T.out, o.outName, { note: o.outNote,
-      badge: SG.cmpBadge(SG.cmp(SG.bfTensor("mid + down", [1, HID], SV.addWords(T.mid.data, T.down.data)), T.out), "잔차 재계산", { formula: "bf16( fp32(mid) + fp32(down) )", open: see(T.out) }) });
+      badge: SG.cmpBadge(SG.cmp(SG.bfTensor("mid + down", [1, HID], SV.addWords(T.mid.data, T.down.data)), T.out), "Residual recompute", { formula: "bf16( fp32(mid) + fp32(down) )", open: see(T.out) }) });
   }
   /** Ratios that summarise what one layer did to one token. */
   function layerRatios(T) {
     return U.kv([
-      ["‖o‖ / ‖in‖ (어텐션 갱신)", ST.fmt(R.norm(T.o.data) / R.norm(T.in.data), 4)],
-      ["‖down‖ / ‖mid‖ (MLP 갱신)", ST.fmt(R.norm(T.down.data) / R.norm(T.mid.data), 4)],
+      ["‖o‖ / ‖in‖ (attention update)", ST.fmt(R.norm(T.o.data) / R.norm(T.in.data), 4)],
+      ["‖down‖ / ‖mid‖ (MLP update)", ST.fmt(R.norm(T.down.data) / R.norm(T.mid.data), 4)],
       ["cos(in, out)", ST.fmt(R.cos(T.in.data, T.out.data), 5)],
       ["‖in‖ → ‖out‖", `${ST.fmt(R.norm(T.in.data), 5)} → ${ST.fmt(R.norm(T.out.data), 5)}`],
     ], "tight");
@@ -358,84 +358,84 @@ const SL = (() => {
   function renderPrompt(el, ctx) {
     const L = D.L(), pos = ctx.sel.pos, im = D.imageOf(pos), id = D.S.ids[pos], nTxt = PL() - D.nImages() * 180;
     const cards = SG.head(el, {
-      kind: "prompt", kicker: "6 · LLM 프리필 · 프롬프트",
-      title: "프롬프트 — 토큰 4,580개를 5120차원 벡터로",
-      desc: `채팅 템플릿으로 만든 입력 토큰 ${ST.fmt(L.L)}개 가운데 앞 ${ST.fmt(PL())}개(텍스트 ${nTxt} + 이미지 토큰 ${D.nImages()} × 180)를 한 번에 통과시키는 것이 프리필입니다. ` +
-        `마지막 토큰 #${PL()}(줄바꿈 Ċ)은 디코드 스텝 0의 입력이 됩니다. 텍스트 토큰은 임베딩 표에서 한 행을 가져오고, ` +
-        "<span class=\"tok\">&lt;|image_pad|&gt;</span> 자리는 비전 병합기 출력 행으로 덮어씁니다. 위치는 1차원 번호가 아니라 M-RoPE의 (t, h, w) 세 축으로 매깁니다.",
-      formula: "inputs_embeds[p] = E[id<sub>p</sub>] (텍스트) · merger.out[k·180 + m] (이미지 k의 토큰 m)",
-      badges: [SG.check("tokens.prompt_matches_capture", "프롬프트 = 캡처"), SG.check("llm.embed_image_rows_eq_merger_out", "이미지 행 = 병합기 출력"),
-        SG.check("llm.focal_positions", "초점 이미지 위치")],
+      kind: "prompt", kicker: "6 · LLM prefill · Prompt",
+      title: "Prompt — 4,580 tokens into 5120-dim vectors",
+      desc: `Prefill runs the first ${ST.fmt(PL())} of the ${ST.fmt(L.L)} input tokens built with the chat template (${nTxt} text + ${D.nImages()} × 180 image tokens) through the model at once. ` +
+        `The last token #${PL()} (newline Ċ) becomes the input of decode step 0. Text tokens take one row of the embedding table, and ` +
+        "<span class=\"tok\">&lt;|image_pad|&gt;</span> slots are overwritten with rows of the vision merger output. Positions are not 1D indices but coordinates on the three M-RoPE axes (t, h, w).",
+      formula: "inputs_embeds[p] = E[id<sub>p</sub>] (text) · merger.out[k·180 + m] (token m of image k)",
+      badges: [SG.check("tokens.prompt_matches_capture", "Prompt = capture"), SG.check("llm.embed_image_rows_eq_merger_out", "Image rows = merger output"),
+        SG.check("llm.focal_positions", "Focal image positions")],
       nav: posPicker(ctx),
     });
 
-    SG.lazy(cards, ctx, `토큰 지도 — 위치 ${ST.fmt(L.L)}개`, { wide: true,
-      sub: "한 칸이 토큰 하나(한 줄에 120개)이고 색은 구간입니다. 이미지 24장은 카메라별 색, 그 뒤는 텍스트·궤적 이력입니다. 칸을 누르면 그 위치를 고릅니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Token map — ${ST.fmt(L.L)} positions`, { wide: true,
+      sub: "Each cell is one token (120 per row), colored by segment. The 24 images are colored by camera, followed by text and trajectory history. Click a cell to select that position." }, async (body) => {
       SG.tokenMap(body, { n: L.L, sel: [pos], onPick: (p) => (p >= PL() ? ctx.go("decode", 0) : ctx.setSel("pos", p)),
-        hover: (p) => (p >= PL() ? "<br>디코드 스텝 0의 입력 (누르면 이동)" : "") });
+        hover: (p) => (p >= PL() ? "<br>input of decode step 0 (click to go there)" : "") });
       SG.binLegend(body);
     });
 
-    SG.lazy(cards, ctx, `선택한 위치 — ${esc(D.posLabel(pos))}`, {}, async (body) => {
+    SG.lazy(cards, ctx, `Selected position — ${esc(D.posLabel(pos))}`, {}, async (body) => {
       const e = await ctx.read(D.F.lembed, "inputs_embeds", { rows: [pos, pos + 1] });
       const raw = D.S.idsRaw ? D.S.idsRaw[pos] : id;
       body.appendChild(U.kv([
-        ["토큰", SG.tokChip(id)],
+        ["Token", SG.tokChip(id)],
         ["id", String(id) + (raw !== id ? ` <span class="muted">(input_ids_raw ${raw})</span>` : "")],
-        ["구간", esc(D.binName(D.bin(pos)))],
+        ["Segment", esc(D.binName(D.bin(pos)))],
         ["M-RoPE (t, h, w)", `<span class="mono">${D.mrope(pos).join(", ")}</span>`],
       ], "tight"));
       body.appendChild(contextChips(ctx, pos));
       let badge = null, note = null;
       if (im) {
         const mo = await ctx.read(D.F.vmerger, "out", { rows: [im.row, im.row + 1] });
-        badge = SG.cmpBadge(SG.cmp(e, mo), "= 병합기 출력", { formula: `inputs_embeds[${pos}] = merger.out[${im.row}]`, open: (i) => Insp.value(e, i) });
-        note = `이미지 ${im.k}의 병합 토큰 ${im.m} = merger.out 행 ${im.row} (= ${im.k}·180 + ${im.m})`;
+        badge = SG.cmpBadge(SG.cmp(e, mo), "= merger output", { formula: `inputs_embeds[${pos}] = merger.out[${im.row}]`, open: (i) => Insp.value(e, i) });
+        note = `Merged token ${im.m} of image ${im.k} = merger.out row ${im.row} (= ${im.k}·180 + ${im.m})`;
       } else {
         const q = sameIdPos(id, pos);
         if (q >= 0) {
           const e2 = await ctx.read(D.F.lembed, "inputs_embeds", { rows: [q, q + 1] });
-          badge = SG.cmpBadge(SG.cmp(e, e2), `= 같은 토큰 #${q}`, { formula: `E[${id}]는 위치와 무관: inputs_embeds[${pos}] = inputs_embeds[${q}]`, open: (i) => Insp.value(e, i) });
-        } else note = "이 토큰은 프리필 구간에 한 번만 나옵니다.";
+          badge = SG.cmpBadge(SG.cmp(e, e2), `= same token #${q}`, { formula: `E[${id}] does not depend on position: inputs_embeds[${pos}] = inputs_embeds[${q}]`, open: (i) => Insp.value(e, i) });
+        } else note = "This token appears only once in the prefill.";
       }
       fr(body, e, "inputs_embeds", { label: esc(`inputs_embeds · ${D.posLabel(pos)}`), badge, note });
       if (im) {
         const pad = await ctx.read(D.F.lembed, "image_pad_embed");
-        fr(body, pad, "image_pad_embed", { note: "원래 이 자리에 있던 토큰 &lt;|image_pad|&gt;의 임베딩 행. 모든 이미지 자리가 이 값으로 시작했다가 병합기 출력으로 덮어써집니다." });
+        fr(body, pad, "image_pad_embed", { note: "Embedding row of the token &lt;|image_pad|&gt; that originally sat here. Every image slot starts with this value and is then overwritten with the merger output." });
         SG.gridImg(body, im.k, { merged: true, W: Math.min(360, U.width(body, 360)), sel: [SG.mergedSel(im.m, SV.selColor())], alpha: 0.25,
-          onHover: (m) => `이미지 ${im.k} · 병합 토큰 ${m} → #${D.posOfMerged(im.k, m)}`, onPick: (m) => ctx.setSel("pos", D.posOfMerged(im.k, m)),
-          caption: `${esc(SV.camTitle(im.k))} · 칸을 누르면 그 토큰의 위치로` });
-        body.appendChild(h("div", { class: "links" }, U.button("이 토큰의 병합기 출력 보기", () => { ctx.setSel("img", im.k, false); ctx.setSel("patch", 4 * im.m, false); ctx.go("merger"); }, "small ghost")));
+          onHover: (m) => `image ${im.k} · merged token ${m} → #${D.posOfMerged(im.k, m)}`, onPick: (m) => ctx.setSel("pos", D.posOfMerged(im.k, m)),
+          caption: `${esc(SV.camTitle(im.k))} · click a cell to go to the position of that token` });
+        body.appendChild(h("div", { class: "links" }, U.button("View the merger output of this token", () => { ctx.setSel("img", im.k, false); ctx.setSel("patch", 4 * im.m, false); ctx.go("merger"); }, "small ghost")));
       }
-      body.appendChild(h("div", { class: "links" }, U.button("레이어 0에서 이 위치 보기 ▶", () => ctx.go("llm", 0, ctx.detail ? 0 : -1), "small")));
+      body.appendChild(h("div", { class: "links" }, U.button("View this position in layer 0 ▶", () => ctx.go("llm", 0, ctx.detail ? 0 : -1), "small")));
     });
 
-    SG.lazy(cards, ctx, "M-RoPE — 위치 (t, h, w)와 cos/sin 표", { wide: true,
-      sub: "텍스트는 t = h = w로 한 칸씩 늘고, 이미지 토큰은 한 이미지 안에서 t가 고정된 채 h, w가 병합 격자 (행, 열)을 따라갑니다. 이미지 다음 텍스트는 앞선 최댓값 + 1부터 이어집니다. 곡선을 누르면 그 위치를 고릅니다." }, async (body) => {
+    SG.lazy(cards, ctx, "M-RoPE — positions (t, h, w) and cos/sin tables", { wide: true,
+      sub: "Text advances one step at a time with t = h = w; within one image, image tokens keep t fixed while h, w follow the merge grid (row, column). Text after an image continues from the previous maximum + 1. Click a curve to select that position." }, async (body) => {
       const n = PL(), mp = D.S.mpos, C = axisColors();
       const cv = U.canvas();
       body.appendChild(cv);
-      Charts.line(cv, { W: U.width(body, 720), H: 200, xlabel: "프롬프트 위치", ylabel: "위치 번호", marks: [pos],
+      Charts.line(cv, { W: U.width(body, 720), H: 200, xlabel: "prompt position", ylabel: "position id", marks: [pos],
         series: [0, 1, 2].map((a) => ({ y: mp.subarray(a * n, (a + 1) * n), color: C[a], width: a ? 1 : 1.5, label: AXIS[a] })),
         xname: (x) => esc(D.posLabel(x)), onPick: (hv) => ctx.setSel("pos", hv.i) });
       const [cs, sn] = await Promise.all([ctx.read(D.F.lembed, "cos", { rows: [pos, pos + 1] }), ctx.read(D.F.lembed, "sin", { rows: [pos, pos + 1] })]);
-      const thw = D.mrope(pos), re = mropeRow(thw), ap = { approx: true, note: "각도는 fp32로 정확히 같지만 cos/sin 구현(CUDA vs JavaScript)이 달라 bf16 경계에서 1 ulp씩 갈릴 수 있습니다." };
-      body.appendChild(U.kv([["선택 위치", esc(D.posLabel(pos))], ["(t, h, w)", `<span class="mono">(${thw.join(", ")})</span>`],
-        ["주파수 축", axisStrip()], ["각도", "θ<sub>d</sub> = inv_freq[j] · pos[axis(j)], j = d mod 64, inv_freq[j] = 5,000,000<sup>−2j/128</sup>"]], "tight"));
-      fr(body, cs, "cos", { colName: (d) => `d ${d} · j ${d % 64} · ${AXIS[axisOf(d % 64)]}`, badge: SG.cmpBadge(SG.cmp(re.cos, cs), "재계산", { ...ap, formula: "bf16( cos(θ) ) (fp32)", open: (i) => Insp.value(cs, i) }) });
-      fr(body, sn, "sin", { colName: (d) => `d ${d} · j ${d % 64} · ${AXIS[axisOf(d % 64)]}`, badge: SG.cmpBadge(SG.cmp(re.sin, sn), "재계산", { ...ap, formula: "bf16( sin(θ) ) (fp32)", open: (i) => Insp.value(sn, i) }) });
-      body.appendChild(U.note("interleaved M-RoPE (mrope_section [24, 20, 20]): 주파수 j가 3의 배수가 아니면서 60보다 작으면 j mod 3 = 1은 h, 2는 w, 나머지는 t 축을 씁니다. " +
-        "그래서 높은 주파수부터 낮은 주파수까지 세 축이 골고루 섞입니다. 레이어마다 이 표로 q·k를 회전시키며 (레이어 단계의 RoPE 칸).", "small"));
+      const thw = D.mrope(pos), re = mropeRow(thw), ap = { approx: true, note: "The angles match exactly in fp32, but the cos/sin implementations (CUDA vs JavaScript) differ, so values can differ by 1 ulp at bf16 rounding boundaries." };
+      body.appendChild(U.kv([["Selected position", esc(D.posLabel(pos))], ["(t, h, w)", `<span class="mono">(${thw.join(", ")})</span>`],
+        ["Frequency axes", axisStrip()], ["Angle", "θ<sub>d</sub> = inv_freq[j] · pos[axis(j)], j = d mod 64, inv_freq[j] = 5,000,000<sup>−2j/128</sup>"]], "tight"));
+      fr(body, cs, "cos", { colName: (d) => `d ${d} · j ${d % 64} · ${AXIS[axisOf(d % 64)]}`, badge: SG.cmpBadge(SG.cmp(re.cos, cs), "Recompute", { ...ap, formula: "bf16( cos(θ) ) (fp32)", open: (i) => Insp.value(cs, i) }) });
+      fr(body, sn, "sin", { colName: (d) => `d ${d} · j ${d % 64} · ${AXIS[axisOf(d % 64)]}`, badge: SG.cmpBadge(SG.cmp(re.sin, sn), "Recompute", { ...ap, formula: "bf16( sin(θ) ) (fp32)", open: (i) => Insp.value(sn, i) }) });
+      body.appendChild(U.note("Interleaved M-RoPE (mrope_section [24, 20, 20]): for frequency j below 60 that is not a multiple of 3, j mod 3 = 1 uses the h axis and 2 the w axis; all others use the t axis. " +
+        "So the three axes are spread evenly from high to low frequencies. Every layer rotates q and k with this table (the RoPE rows in the layer steps).", "small"));
     });
 
-    SG.lazy(cards, ctx, "궤적 이력 토큰 — 과거 궤적을 텍스트 토큰으로", {
-      sub: `위치 ${L.history_start + 1}–${L.history_end - 1}의 토큰 45개가 과거 15개 시점의 변위 (Δ<sub>x</sub>, Δ<sub>y</sub>, Δ<sub>z</sub>)입니다. 행을 누르면 그 위치를 고릅니다.` }, async (body) => {
+    SG.lazy(cards, ctx, "Trajectory history tokens — the past trajectory as text tokens", {
+      sub: `The 45 tokens at positions ${L.history_start + 1}–${L.history_end - 1} are the displacements (Δ<sub>x</sub>, Δ<sub>y</sub>, Δ<sub>z</sub>) at 15 past time points. Click a row to select that position.` }, async (body) => {
       const HS = D.historyDecode(), cur = HS.findIndex((r) => pos >= r.pos && pos < r.pos + 3);
-      body.appendChild(h("div", { class: "tbl-wrap" }, U.table(["#", "위치", "토큰 V", "복원 Δ", "실제 Δ"], HS.map((r) => [String(r.j), `${r.pos}–${r.pos + 2}`,
+      body.appendChild(h("div", { class: "tbl-wrap" }, U.table(["#", "Position", "Token V", "Decoded Δ", "Actual Δ"], HS.map((r) => [String(r.j), `${r.pos}–${r.pos + 2}`,
         `<span class="mono">${r.V.join(", ")}</span>`, `<span class="mono">${r.d.map((v) => ST.fmt(v, 3)).join(", ")}</span>`,
         `<span class="mono">${r.truth.map((v) => ST.fmt(v, 3)).join(", ")}</span>`]), { cls: "small", sel: cur, onRow: (i) => ctx.setSel("pos", HS[i].pos) })));
-      body.appendChild(U.note("토큰 &lt;iV&gt;(V = 0…999)를 Δ<sub>x</sub>, Δ<sub>y</sub> = V/999·8 − 4, Δ<sub>z</sub> = V/999·20 − 10으로 되돌린 값(DeltaTrajectoryTokenizer)입니다. " +
-        "1000단계로 양자화했기 때문에 실제 Δ와 조금 다릅니다.", "small"));
+      body.appendChild(U.note("Values decoded from the tokens &lt;iV&gt; (V = 0…999) as Δ<sub>x</sub>, Δ<sub>y</sub> = V/999·8 − 4, Δ<sub>z</sub> = V/999·20 − 10 (DeltaTrajectoryTokenizer). " +
+        "They differ slightly from the actual Δ because of the 1000-level quantization.", "small"));
     });
 
     const statBox = h("div");
@@ -445,13 +445,13 @@ const SL = (() => {
       const lg = LTOK_LOG[UIL.tok0], [lo, hi] = lg ? posRange(t.data) : [undefined, undefined], lab = LTOK.find((x) => x[0] === UIL.tok0);
       SG.tokenMap(statBox, { n: PL(), values: t.data, log: lg, vmin: lo, vmax: hi, sel: [pos], onPick: (p) => ctx.setSel("pos", p) });
       imgGrids(statBox, ctx, pos, t.data, { log: lg, cbLabel: esc(lab[1]) });
-      statBox.appendChild(U.note(`${esc(lab[2])} · 레이어에 들어가기 전(단계 0 = inputs_embeds). 텍스트와 이미지 토큰의 크기 차이가 레이어를 지나며 어떻게 바뀌는지는 레이어 단계의 “출력”에서 봅니다.`, "small"));
+      statBox.appendChild(U.note(`${esc(lab[2])} · before entering the layers (stage 0 = inputs_embeds). How the size gap between text and image tokens changes through the layers is shown under “Output” in the layer steps.`, "small"));
     })());
-    SG.lazy(cards, ctx, "임베딩 통계 — 위치별 크기 (단계 0)", { wide: true, tools: U.seg(LTOK.slice(0, 3), UIL.tok0, (v) => { UIL.tok0 = v; draw0(); }, "small") },
+    SG.lazy(cards, ctx, "Embedding stats — size per position (stage 0)", { wide: true, tools: U.seg(LTOK.slice(0, 3), UIL.tok0, (v) => { UIL.tok0 = v; draw0(); }, "small") },
       async (body) => { body.appendChild(statBox); await draw0(); });
 
-    cards.appendChild(U.card("다음", {}, h("p", { class: "prose", html: "이제 이 4,579 × 5120 행렬이 디코더 레이어 64개를 차례로 지나갑니다. 레이어마다 어텐션으로 다른 위치의 정보를 섞고, MLP로 위치마다 변환합니다." }),
-      h("div", { class: "links" }, U.button("LLM 레이어 0 ▶", () => ctx.go("llm", 0, ctx.detail ? 0 : -1), ""))));
+    cards.appendChild(U.card("Next", {}, h("p", { class: "prose", html: "This 4,579 × 5120 matrix now passes through the 64 decoder layers in turn. Each layer mixes in information from other positions with attention and transforms each position with the MLP." }),
+      h("div", { class: "links" }, U.button("LLM layer 0 ▶", () => ctx.go("llm", 0, ctx.detail ? 0 : -1), ""))));
   }
 
   /** First other prompt position with the same token id (-1 if none). */
@@ -468,7 +468,7 @@ const SL = (() => {
       const im = D.imageOf(q);
       if (im) {
         const end = Math.min(b, D.L().images[im.k][1] - 1), hit = pos >= q && pos <= end;
-        box.appendChild(U.button(`[이미지 ${im.k}${hit ? ` · 토큰 ${pos - D.L().images[im.k][0]}` : ""}]`, () => ctx.setSel("pos", hit ? pos : q), "small ghost chip" + (hit ? " sel" : ""), D.posLabel(q)));
+        box.appendChild(U.button(`[image ${im.k}${hit ? ` · token ${pos - D.L().images[im.k][0]}` : ""}]`, () => ctx.setSel("pos", hit ? pos : q), "small ghost chip" + (hit ? " sel" : ""), D.posLabel(q)));
         q = end;
         continue;
       }
@@ -477,22 +477,22 @@ const SL = (() => {
     return box;
   }
 
-  SG.reg("prompt", { title: () => "프롬프트", render: renderPrompt });
+  SG.reg("prompt", { title: () => "Prompt", render: renderPrompt });
 
-  // ================================================================ recomputations (analysis → 검증)
+  // ================================================================ recomputations (analysis → checks)
   const rd = (url, key, o) => ST.read(url, key, o);
-  const LAYER_PARAM = { name: "레이어", min: 0, max: 63, def: () => 0 };
-  const IMG_PARAM = { name: "이미지", min: 0, max: 23, def: () => SG.SEL.img };
+  const LAYER_PARAM = { name: "Layer", min: 0, max: 63, def: () => 0 };
+  const IMG_PARAM = { name: "Image", min: 0, max: 23, def: () => SG.SEL.img };
 
-  SG.addRecompute({ id: "llm.embed_img", group: "LLM", kind: "bitwise", name: "inputs_embeds[이미지] = merger.out", param: IMG_PARAM,
-    desc: "이미지 한 장의 토큰 180개 × 5120: image_pad 임베딩 자리를 병합기 출력으로 덮어씀", run: async (k) => {
+  SG.addRecompute({ id: "llm.embed_img", group: "LLM", kind: "bitwise", name: "inputs_embeds[image] = merger.out", param: IMG_PARAM,
+    desc: "180 tokens × 5120 of one image: the image_pad embedding slots are overwritten with the merger output", run: async (k) => {
       const a0 = D.L().images[k][0];
       const [e, m] = await Promise.all([rd(D.F.lembed, "inputs_embeds", { rows: [a0, a0 + 180] }), rd(D.F.vmerger, "out", { rows: [k * 180, k * 180 + 180] })]);
-      return [{ label: `이미지 ${k}`, res: SG.cmp(e, m) }];
+      return [{ label: `Image ${k}`, res: SG.cmp(e, m) }];
     } });
 
-  SG.addRecompute({ id: "llm.mrope_tables", group: "LLM", kind: "approx", name: "M-RoPE 표 cos, sin (위치 4,579개)",
-    desc: "(t, h, w)에서 interleaved M-RoPE [24, 20, 20]로 각도를 만들고 fp32 cos/sin → bf16. 삼각함수 구현 차이로 근사", run: async () => {
+  SG.addRecompute({ id: "llm.mrope_tables", group: "LLM", kind: "approx", name: "M-RoPE tables cos, sin (4,579 positions)",
+    desc: "Angles from (t, h, w) with interleaved M-RoPE [24, 20, 20], then fp32 cos/sin → bf16. Approximate because the trig implementations differ", run: async () => {
       const [cs, sn] = await Promise.all([rd(D.F.lembed, "cos"), rd(D.F.lembed, "sin")]);
       const n = PL(), inv = invFreqLLM(), wc = new Uint16Array(n * HD), ws = new Uint16Array(n * HD);
       for (let p = 0; p < n; p++) {
@@ -507,7 +507,7 @@ const SL = (() => {
     } });
 
   SG.addRecompute({ id: "llm.rope_qk", group: "LLM", kind: "bitwise", name: "qr, kr = M-RoPE(qn, kn)", param: LAYER_PARAM,
-    desc: "프로브 22개 × (쿼리 64 + 키 8) 헤드: x' = bf16(bf16(x·cos) + bf16(rotate_half(x)·sin))", run: async (l) => {
+    desc: "22 probes × (64 query + 8 key) heads: x' = bf16(bf16(x·cos) + bf16(rotate_half(x)·sin))", run: async (l) => {
       const url = D.F.layer(l);
       const [qn, kn, qr, kr, cs, sn] = await Promise.all([rd(url, "qn"), rd(url, "kn"), rd(url, "qr"), rd(url, "kr"), rd(D.F.lembed, "cos"), rd(D.F.lembed, "sin")]);
       const nP = P().length, wq = new Uint16Array(nP * NQ * HD), wk = new Uint16Array(nP * NKV * HD);
@@ -516,50 +516,50 @@ const SL = (() => {
         for (let hh = 0; hh < NQ; hh++) for (let d = 0; d < HD; d++) wq[(j * NQ + hh) * HD + d] = ST.bf16Round(R.ropeLLM(qn.data, (j * NQ + hh) * HD, cs.data, sn.data, co, d));
         for (let hh = 0; hh < NKV; hh++) for (let d = 0; d < HD; d++) wk[(j * NKV + hh) * HD + d] = ST.bf16Round(R.ropeLLM(kn.data, (j * NKV + hh) * HD, cs.data, sn.data, co, d));
       }
-      return [{ label: `레이어 ${l} qr`, res: SG.cmp(SG.bfTensor("RoPE(qn)", qr.shape, wq), qr) }, { label: `레이어 ${l} kr`, res: SG.cmp(SG.bfTensor("RoPE(kn)", kr.shape, wk), kr) }];
+      return [{ label: `Layer ${l} qr`, res: SG.cmp(SG.bfTensor("RoPE(qn)", qr.shape, wq), qr) }, { label: `Layer ${l} kr`, res: SG.cmp(SG.bfTensor("RoPE(kn)", kr.shape, wk), kr) }];
     } });
 
-  SG.addRecompute({ id: "llm.residual", group: "LLM", kind: "bitwise", name: "잔차 덧셈 mid = in + o, out = mid + down", param: LAYER_PARAM,
-    desc: "프로브 22개 × 5120, bf16 덧셈 (out은 위치로 색인된 레이어 출력에서 프로브 행)", run: async (l) => {
+  SG.addRecompute({ id: "llm.residual", group: "LLM", kind: "bitwise", name: "Residual additions mid = in + o, out = mid + down", param: LAYER_PARAM,
+    desc: "22 probes × 5120, bf16 addition (out takes the probe rows of the position-indexed layer output)", run: async (l) => {
       const url = D.F.layer(l), nP = P().length;
       const [x, o, mid, dn] = await Promise.all(["in", "o", "mid", "down"].map((k) => rd(url, k)));
       const outs = await Promise.all(Array.from(P(), (q) => rd(url, "out", { rows: [q, q + 1] })));
       const ow = new Uint16Array(nP * HID);
       outs.forEach((t, j) => ow.set(t.bits, j * HID));
-      return [{ label: `레이어 ${l} mid`, res: SG.cmp(SG.bfTensor("in + o", mid.shape, SV.addWords(x.data, o.data)), mid) },
-        { label: `레이어 ${l} out`, res: SG.cmp(SG.bfTensor("mid + down", [nP, HID], SV.addWords(mid.data, dn.data)), SG.bfTensor("out[프로브]", [nP, HID], ow)) }];
+      return [{ label: `Layer ${l} mid`, res: SG.cmp(SG.bfTensor("in + o", mid.shape, SV.addWords(x.data, o.data)), mid) },
+        { label: `Layer ${l} out`, res: SG.cmp(SG.bfTensor("mid + down", [nP, HID], SV.addWords(mid.data, dn.data)), SG.bfTensor("out[probes]", [nP, HID], ow)) }];
     } });
 
   SG.addRecompute({ id: "llm.silu", group: "LLM", kind: "approx", name: "act = SiLU(gate)", param: LAYER_PARAM,
-    desc: "프로브 22개 × 25600: bf16(gate / (1 + exp(−gate))), fp32. exp 구현 차이로 근사", run: async (l) => {
+    desc: "22 probes × 25600: bf16(gate / (1 + exp(−gate))), fp32. Approximate because the exp implementations differ", run: async (l) => {
       const [g, a] = await Promise.all([rd(D.F.layer(l), "gate"), rd(D.F.layer(l), "act")]);
       const w = new Uint16Array(g.data.length);
       for (let i = 0; i < w.length; i++) w[i] = ST.bf16Round(R.silu(g.data[i]));
-      return [{ label: `레이어 ${l} act`, res: SG.cmp(SG.bfTensor("silu(gate)", a.shape, w), a), approx: true }];
+      return [{ label: `Layer ${l} act`, res: SG.cmp(SG.bfTensor("silu(gate)", a.shape, w), a), approx: true }];
     } });
 
   SG.addRecompute({ id: "llm.swiglu_mul", group: "LLM", kind: "bitwise", name: "down_in = act · up", param: LAYER_PARAM,
-    desc: "프로브 22개 × 25600, bf16 곱셈", run: async (l) => {
+    desc: "22 probes × 25600, bf16 multiplication", run: async (l) => {
       const [a, u, di] = await Promise.all(["act", "up", "down_in"].map((k) => rd(D.F.layer(l), k)));
       const w = new Uint16Array(a.data.length);
       for (let i = 0; i < w.length; i++) w[i] = ST.bf16Round(R.f32(a.data[i] * u.data[i]));
-      return [{ label: `레이어 ${l} down_in`, res: SG.cmp(SG.bfTensor("act · up", di.shape, w), di) }];
+      return [{ label: `Layer ${l} down_in`, res: SG.cmp(SG.bfTensor("act · up", di.shape, w), di) }];
     } });
 
-  SG.addRecompute({ id: "llm.deepstack_add", group: "LLM", kind: "bitwise", name: "딥스택 덧셈 = 레이어 i 출력 + 병합기 i 출력", param: { name: "딥스택", min: 0, max: 2, def: () => SG.SEL.ds },
-    desc: "선택 이미지의 토큰 180개 × 5120: 레이어 i 출력의 이미지 행에 딥스택 특징을 더한 값 = 레이어 i+1 입력", run: async (i) => {
+  SG.addRecompute({ id: "llm.deepstack_add", group: "LLM", kind: "bitwise", name: "DeepStack addition = layer i output + merger i output", param: { name: "DeepStack", min: 0, max: 2, def: () => SG.SEL.ds },
+    desc: "180 tokens × 5120 of the selected image: image rows of layer i output plus the DeepStack feature = layer i+1 input", run: async (i) => {
       const k = SG.SEL.img, a0 = D.L().images[k][0];
       const [o, f, af] = await Promise.all([rd(D.F.layer(i), "out", { rows: [a0, a0 + 180] }), rd(D.F.vds(i), "out", { rows: [k * 180, k * 180 + 180] }),
         rd(D.F.lds(i), "image_rows_after", { rows: [k * 180, k * 180 + 180] })]);
-      return [{ label: `딥스택 ${i} · 이미지 ${k}`, res: SG.cmp(SG.bfTensor("out + feat", af.shape, SV.addWords(o.data, f.data)), af) }];
+      return [{ label: `DeepStack ${i} · image ${k}`, res: SG.cmp(SG.bfTensor("out + feat", af.shape, SV.addWords(o.data, f.data)), af) }];
     } });
 
-  SG.addRecompute({ id: "llm.rms_gamma", group: "LLM", kind: "estimate", name: "RMSNorm₁ γ 추정 → ln1 재현", param: LAYER_PARAM,
-    desc: "프로브 22개의 (in, ln1)로 채널별 γ를 맞춘 뒤 bf16(γ · bf16(x·rsqrt(mean x² + ε)))로 ln1을 다시 만듦. 같은 데이터로 맞춘 값이라 검증이 아닌 자기 일관성 확인(추정)", run: async (l) => {
+  SG.addRecompute({ id: "llm.rms_gamma", group: "LLM", kind: "estimate", name: "RMSNorm₁ γ estimate → rebuild ln1", param: LAYER_PARAM,
+    desc: "Fits per-channel γ to (in, ln1) of the 22 probes, then rebuilds ln1 as bf16(γ · bf16(x·rsqrt(mean x² + ε))). Fitted on the same data, so this is a self-consistency check, not a verification (estimate)", run: async (l) => {
       const [x, y] = await Promise.all([rd(D.F.layer(l), "in"), rd(D.F.layer(l), "ln1")]);
       const rows = P().length, est = gammaEst(x.data, y.data, y.bits, rows, HID), n = rmsN(x.data, rows, HID), w = new Uint16Array(rows * HID);
       for (let r = 0; r < rows; r++) for (let c = 0; c < HID; c++) w[r * HID + c] = ST.bf16Round(R.f32(est.g[c] * n[r * HID + c]));
-      return [{ label: `레이어 ${l} ln1 (γ 추정)`, res: SG.cmp(SG.bfTensor("γ̂ · n", y.shape, w), y), approx: true, note: `모든 행이 맞는 채널 ${est.full}/${HID}` }];
+      return [{ label: `Layer ${l} ln1 (γ estimate)`, res: SG.cmp(SG.bfTensor("γ̂ · n", y.shape, w), y), approx: true, note: `Channels matching in every row: ${est.full}/${HID}` }];
     } });
 
   return {

@@ -19,16 +19,16 @@ const Insp = (() => {
   let cur = null, token = 0;
   const { h, esc } = U;
 
-  const HELP = "스테이지의 차트·표·칩에서 값을 클릭하면 여기에 저장된 비트, 인덱스의 의미, 이웃 값, 속한 행의 통계가 표시됩니다. " +
-    "“텐서 열기”로 파일 속 텐서 전체를 창 단위로 열 수 있고, ◀ 뒤로로 이전 화면에 돌아갑니다.";
+  const HELP = "Click a value in a chart, table or chip in the main view to see its stored bits, what its indices mean, its neighboring values and the stats of its row here. " +
+    "“Open tensor” opens the whole tensor from the file window by window, and ◀ Back returns to the previous view.";
 
   function mount(el, { onShowView = null } = {}) {
     root = el;
     onShow = onShowView;
     root.innerHTML = "";
-    backBtn = U.button("◀ 뒤로", back, "small", "이전 인스펙터 화면");
-    titleEl = h("div", { class: "insp-t" }, "인스펙터");
-    const head = h("div", { class: "insp-h" }, backBtn, titleEl, U.button("✕", clear, "small ghost", "비우기"));
+    backBtn = U.button("◀ Back", back, "small", "Previous inspector view");
+    titleEl = h("div", { class: "insp-t" }, "Inspector");
+    const head = h("div", { class: "insp-h" }, backBtn, titleEl, U.button("✕", clear, "small ghost", "Clear"));
     bodyEl = h("div", { class: "insp-b" });
     root.append(head, bodyEl);
     clear();
@@ -57,7 +57,7 @@ const Insp = (() => {
   function clear() {
     stack.length = 0; cur = null; token++;
     if (!root) return;
-    titleEl.textContent = "인스펙터";
+    titleEl.textContent = "Inspector";
     bodyEl.innerHTML = "";
     bodyEl.appendChild(U.note(HELP));
     backBtn.disabled = true;
@@ -74,53 +74,53 @@ const Insp = (() => {
   const cams = (k) => { const c = D.camOf(k); return `${c.title} f${c.frame}`; };
   const focal = () => D.L().focal_image;
   const NAMES = {
-    rc: ["행", "열"], thw: ["t", "h", "w"], mrope: ["t (시간)", "h (행)", "w (열)"], xyz: ["x (전방)", "y (좌)", "z (위)"],
-    act2: ["0: 가속", "1: 곡률"], rgb: ["PC1 → R", "PC2 → G", "PC3 → B"], mom: ["n", "Σx", "Σx²", "Σx³", "Σx⁴"],
-    istat: ["absmax", "rms", "첨도"], vism: ["fc1", "fc2"],
+    rc: ["row", "column"], thw: ["t", "h", "w"], mrope: ["t (time)", "h (row)", "w (column)"], xyz: ["x (forward)", "y (left)", "z (up)"],
+    act2: ["0: acceleration", "1: curvature"], rgb: ["PC1 → R", "PC2 → G", "PC3 → B"], mom: ["n", "Σx", "Σx²", "Σx³", "Σx⁴"],
+    istat: ["absmax", "rms", "kurtosis"], vism: ["fc1", "fc2"],
   };
   const AX = {
-    vrow: (i) => { const k = Math.floor(i / 720), p = i % 720, [r, c] = D.patchRC(p); return `이미지 ${k} (${cams(k)}) · 패치 ${p} (행 ${r}, 열 ${c})`; },
-    fpatch: (p) => { const [r, c] = D.patchRC(p); return `초점 이미지 ${focal()} · 패치 ${p} (행 ${r}, 열 ${c}) → 병합 토큰 ${p >> 2}`; },
-    fmerged: (m) => { const [br, bc] = D.mergedRC(m); return `초점 이미지 ${focal()} · 병합 토큰 ${m} (${br},${bc}) = 위치 #${D.posOfMerged(focal(), m)}`; },
-    mrow: (i) => { const k = Math.floor(i / 180), m = i % 180, [br, bc] = D.mergedRC(m); return `이미지 ${k} (${cams(k)}) · 병합 토큰 ${m} (${br},${bc}) = 위치 #${D.posOfMerged(k, m)}`; },
-    img: (k) => `이미지 ${k} (${cams(k)})`,
-    vhead: (i) => `비전 헤드 ${i}`,
-    vblock: (i) => `비전 블록 ${i}`,
-    vstage: (i) => (i === 0 ? "patch_out (패치 임베딩)" : i === 1 ? "after_pos (+pos)" : `비전 블록 ${i - 2} 출력`),
+    vrow: (i) => { const k = Math.floor(i / 720), p = i % 720, [r, c] = D.patchRC(p); return `Image ${k} (${cams(k)}) · patch ${p} (row ${r}, col ${c})`; },
+    fpatch: (p) => { const [r, c] = D.patchRC(p); return `Focal image ${focal()} · patch ${p} (row ${r}, col ${c}) → merged token ${p >> 2}`; },
+    fmerged: (m) => { const [br, bc] = D.mergedRC(m); return `Focal image ${focal()} · merged token ${m} (${br},${bc}) = position #${D.posOfMerged(focal(), m)}`; },
+    mrow: (i) => { const k = Math.floor(i / 180), m = i % 180, [br, bc] = D.mergedRC(m); return `Image ${k} (${cams(k)}) · merged token ${m} (${br},${bc}) = position #${D.posOfMerged(k, m)}`; },
+    img: (k) => `Image ${k} (${cams(k)})`,
+    vhead: (i) => `Vision head ${i}`,
+    vblock: (i) => `Vision block ${i}`,
+    vstage: (i) => (i === 0 ? "patch_out (patch embedding)" : i === 1 ? "after_pos (+pos)" : `Vision block ${i - 2} output`),
     vint: (i) => D.VIS_INT[i] || null,
     lin_v: (i) => D.LIN_V[i] || null,
     lin_l: (i) => D.LIN_L[i] || null,
     pos: (i) => D.posLabel(i),
     kpos: (i) => D.posLabel(i),
-    lhead: (i) => `LLM 헤드 ${i} (KV 헤드 ${i >> 3})`,
-    kvhead: (i) => `KV 헤드 ${i}`,
-    llayer: (i) => `LLM 레이어 ${i}`,
-    lstage: (i) => (i === 0 ? "임베딩 (레이어 0 입력)" : `LLM 레이어 ${i - 1} 출력`),
-    elayer: (i) => `전문가 레이어 ${i}`,
-    estage: (i) => (i === 0 ? "in_norm (레이어 0 입력)" : `전문가 레이어 ${i - 1} 출력`),
-    ehead: (i) => `전문가 헤드 ${i} (KV 헤드 ${i >> 1})`,
-    probe: (i) => `프로브 ${i}: ${D.posLabel(D.S.probes[i])}`,
+    lhead: (i) => `LLM head ${i} (KV head ${i >> 3})`,
+    kvhead: (i) => `KV head ${i}`,
+    llayer: (i) => `LLM layer ${i}`,
+    lstage: (i) => (i === 0 ? "Embedding (layer 0 input)" : `LLM layer ${i - 1} output`),
+    elayer: (i) => `Expert layer ${i}`,
+    estage: (i) => (i === 0 ? "in_norm (layer 0 input)" : `Expert layer ${i - 1} output`),
+    ehead: (i) => `Expert head ${i} (KV head ${i >> 1})`,
+    probe: (i) => `Probe ${i}: ${D.posLabel(D.S.probes[i])}`,
     sel: (i) => `sel ${i}: ${D.posLabel(D.S.sel[i])}`,
     bin: (i) => D.binName(i),
-    vocab: (i) => `토큰 id ${i} ${D.tokText(i)}`,
-    wp: (i) => `웨이포인트 ${i} (t = +${ST.fmt(D.T.future_t[i], 3)} s)`,
-    fstep: (i) => `플로 스텝 ${i} (t = ${ST.fmt(i / 10, 2)})`,
+    vocab: (i) => `Token id ${i} ${D.tokText(i)}`,
+    wp: (i) => `Waypoint ${i} (t = +${ST.fmt(D.T.future_t[i], 3)} s)`,
+    fstep: (i) => `Flow step ${i} (t = ${ST.fmt(i / 10, 2)})`,
     fstate: (i) => `x_${i} (t = ${ST.fmt(i / 10, 2)})`,
-    dstep: (i) => `디코드 스텝 ${i}`,
-    rank: (i) => `순위 ${i + 1}`,
-    ds: (i) => `딥스택 ${i} (비전 블록 ${((D.M.config.vision || {}).deepstack_visual_indexes || [8, 16, 24])[i]})`,
+    dstep: (i) => `Decode step ${i}`,
+    rank: (i) => `Rank ${i + 1}`,
+    ds: (i) => `DeepStack ${i} (vision block ${((D.M.config.vision || {}).deepstack_visual_indexes || [8, 16, 24])[i]})`,
     variant: (i) => D.M.sqnr_variants[i] || null,
-    hist_t: (i) => `이력 ${i} (t = ${ST.fmt(D.T.history_t[i], 3)} s)`,
+    hist_t: (i) => `History ${i} (t = ${ST.fmt(D.T.history_t[i], 3)} s)`,
     pix: (j) => `C${Math.floor(j / 512)} (${"RGB"[Math.floor(j / 512)]}) · T${Math.floor(j / 256) % 2} · y${Math.floor(j / 16) % 16} · x${j % 16}`,
     vism_g: (i) => (D.M.meta_vism_groups || ["merger", "deepstack_0", "deepstack_1", "deepstack_2"])[i],
     expx: (i) => ["aip.trunk0", "aip.trunk3", "aip.trunk6", "action_out_proj"][i],
-    gen: (i) => `생성 토큰 ${i}`,
+    gen: (i) => `Generated token ${i}`,
     // gen/sequences: prompt 0..4579, then the 13 sampled tokens (the last one, after EOS, becomes pad in "final").
     seq: (i) => {
       const n = D.S.tokens.length;
       if (i < n) return D.posLabel(i);
       const s = i - n, g = D.M.generation, raw = g.raw[s], fin = g.final[s];
-      return `#${i} 생성 토큰 ${s} ${D.tokText(fin)} (id ${fin}${raw !== fin ? `, 샘플 원본 ${raw} → EOS 이후라 pad` : ""})`;
+      return `#${i} generated token ${s} ${D.tokText(fin)} (id ${fin}${raw !== fin ? `, sampled ${raw} → pad after EOS` : ""})`;
     },
   };
   for (const [k, arr] of Object.entries(NAMES)) AX[k] = (i) => arr[i] ?? null;
@@ -330,15 +330,15 @@ const Insp = (() => {
     const hexs = "0x" + w.toString(16).toUpperCase().padStart(nb / 4, "0");
     const emax = (1 << ne) - 1;
     let formula;
-    if (e === emax) formula = Number(m) ? "NaN (지수 비트 전부 1, 가수 ≠ 0)" : `${s ? "−" : "+"}∞ (지수 비트 전부 1)`;
+    if (e === emax) formula = Number(m) ? "NaN (all exponent bits 1, mantissa ≠ 0)" : `${s ? "−" : "+"}∞ (all exponent bits 1)`;
     else if (e === 0 && m === 0n) formula = `${s ? "−" : "+"}0`;
-    else if (e === 0) formula = `(−1)<sup>${s}</sup> × 2<sup>${1 - bias}</sup> × (${m} / 2<sup>${nm}</sup>) <span class="muted">(비정규수)</span>`;
+    else if (e === 0) formula = `(−1)<sup>${s}</sup> × 2<sup>${1 - bias}</sup> × (${m} / 2<sup>${nm}</sup>) <span class="muted">(subnormal)</span>`;
     else formula = `(−1)<sup>${s}</sup> × 2<sup>${e}−${bias}</sup> × (1 + ${m} / 2<sup>${nm}</sup>) = (−1)<sup>${s}</sup> × 2<sup>${e - bias}</sup> × ${exactDecimal(1 + Number(m) / 2 ** nm, 24)}`;
     const box = h("div", { class: "bits" },
       h("div", { class: "bits-row" }, h("span", { class: "bhex" }, hexs), " = ",
-        h("span", { class: "bs", title: "부호 1비트" }, bin.slice(0, 1)), h("span", { class: "sep" }, "|"),
-        h("span", { class: "be", title: `지수 ${ne}비트 (bias ${bias})` }, bin.slice(1, 1 + ne)), h("span", { class: "sep" }, "|"),
-        h("span", { class: "bm", title: `가수 ${nm}비트` }, bin.slice(1 + ne))),
+        h("span", { class: "bs", title: "Sign, 1 bit" }, bin.slice(0, 1)), h("span", { class: "sep" }, "|"),
+        h("span", { class: "be", title: `Exponent, ${ne} bits (bias ${bias})` }, bin.slice(1, 1 + ne)), h("span", { class: "sep" }, "|"),
+        h("span", { class: "bm", title: `Mantissa, ${nm} bits` }, bin.slice(1 + ne))),
       h("div", { class: "bits-f", html: formula }));
     if (Number.isFinite(v)) {
       // ±0: the neighbours are the smallest subnormals of either sign (w ± 1 would stay on one side).
@@ -346,9 +346,9 @@ const Insp = (() => {
       const dn = v === 0 ? -up : valueOfWord(dt, v > 0 ? w - 1n : w + 1n);
       const ulp = Math.abs(up - v);
       box.appendChild(h("div", { class: "bits-n", html:
-        `정확한 10진값 <b class="mono">${esc(exactDecimal(v))}</b><br>` +
-        `${dt}에서 바로 옆 값: <span class="mono">${esc(ST.exact(dn, dt))}</span> ◀ ▶ <span class="mono">${esc(ST.exact(up, dt))}</span> ` +
-        `<span class="muted">(간격 ulp ${esc(ST.fmt(ulp, 4))}, 상대 ${esc(ST.fmt(v ? ulp / Math.abs(v) : NaN, 3))})</span>` }));
+        `Exact decimal value <b class="mono">${esc(exactDecimal(v))}</b><br>` +
+        `Adjacent values in ${dt}: <span class="mono">${esc(ST.exact(dn, dt))}</span> ◀ ▶ <span class="mono">${esc(ST.exact(up, dt))}</span> ` +
+        `<span class="muted">(ulp spacing ${esc(ST.fmt(ulp, 4))}, relative ${esc(ST.fmt(v ? ulp / Math.abs(v) : NaN, 3))})</span>` }));
     }
     return box;
   }
@@ -360,14 +360,14 @@ const Insp = (() => {
     const bw = ST.bf16Round(v), bv = ST.bf16Value(bw), fw = ST.f16Round(v), fv = valueOfWord("F16", BigInt(fw));
     const rel = (x) => (v ? ST.fmt((x - v) / Math.abs(v), 3) : "–");
     return U.kv([
-      ["bf16 반올림", `<span class="mono">${ST.hex(bw, 4)} → ${esc(ST.exact(bv, "BF16"))}</span> <span class="muted">상대오차 ${rel(bv)}</span>`],
-      ["f16 반올림", `<span class="mono">${ST.hex(fw, 4)} → ${esc(ST.exact(fv, "F16"))}</span> <span class="muted">상대오차 ${rel(fv)}</span>`],
+      ["bf16 rounding", `<span class="mono">${ST.hex(bw, 4)} → ${esc(ST.exact(bv, "BF16"))}</span> <span class="muted">relative error ${rel(bv)}</span>`],
+      ["f16 rounding", `<span class="mono">${ST.hex(fw, 4)} → ${esc(ST.exact(fv, "F16"))}</span> <span class="muted">relative error ${rel(fv)}</span>`],
     ], "tight");
   }
 
   // ================================================================ value view
   function value(t, i, o = {}) {
-    const name = o.label || `${esc(t.url ? D.short(t.url) : "계산값")} · ${esc(t.key || "")}`;
+    const name = o.label || `${esc(t.url ? D.short(t.url) : "computed")} · ${esc(t.key || "")}`;
     show({ title: name, render: (el, alive) => renderValue(el, alive, t, i, o) });
   }
 
@@ -379,24 +379,24 @@ const Insp = (() => {
     const top = h("div", { class: "iv-top" },
       h("div", { class: "iv-big mono" }, isInt(dt) || dt === "BOOL" ? String(v) : ST.exact(v, dt)),
       h("div", { class: "iv-sub" }, U.badge(dt), " ",
-        h("span", { class: "mono" }, `${t.key || "값"}[${coord.join(", ")}]`), h("span", { class: "muted" }, `  모양 [${full.join(", ")}]`)));
+        h("span", { class: "mono" }, `${t.key || "value"}[${coord.join(", ")}]`), h("span", { class: "muted" }, `  shape [${full.join(", ")}]`)));
     el.appendChild(top);
     if (o.note) el.appendChild(U.note(o.note));
 
     const ax = coord.map((c, d) => [d, c, axisLabel(K[d], c)]).filter((x) => x[2]);
-    if (ax.length) el.appendChild(U.kv(ax.map(([d, c, s]) => [`축 ${d} = ${c}`, esc(s)]), "tight axes"));
+    if (ax.length) el.appendChild(U.kv(ax.map(([d, c, s]) => [`Axis ${d} = ${c}`, esc(s)]), "tight axes"));
 
     if (isInt(dt) && TOKEN_KEYS.test(t.key || "")) {
       const tk = h("span", { class: "tok" }, D.tokText(v));
-      el.appendChild(U.kv([["토큰", tk]], "tight"));
-      D.vocab().then(() => { if (alive()) { tk.textContent = D.tokText(v) + (D.isUnknown(v) ? " (디코드 불가)" : ""); } });
+      el.appendChild(U.kv([["Token", tk]], "tight"));
+      D.vocab().then(() => { if (alive()) { tk.textContent = D.tokText(v) + (D.isUnknown(v) ? " (cannot decode)" : ""); } });
     }
-    if (isInt(dt) && POS_KEYS.test(t.key || "")) el.appendChild(U.kv([["위치", esc(D.posLabel(v))]], "tight"));
+    if (isInt(dt) && POS_KEYS.test(t.key || "")) el.appendChild(U.kv([["Position", esc(D.posLabel(v))]], "tight"));
 
     const b = bitsBlock(dt, v, t, i);
-    if (b) el.appendChild(sec("저장된 비트", b));
+    if (b) el.appendChild(sec("Stored bits", b));
     const r = roundBlock(dt, v);
-    if (r) el.appendChild(sec("더 낮은 정밀도로 저장하면", r));
+    if (r) el.appendChild(sec("If stored at lower precision", r));
 
     // the last-dimension row this value belongs to
     const shape = t.shape;
@@ -408,46 +408,46 @@ const Insp = (() => {
       const lo = Math.max(0, j - 6), hi = Math.min(C - 1, j + 6);
       const chips = h("div", { class: "chips" });
       for (let q = lo; q <= hi; q++) {
-        const c = h("button", { class: "chip" + (q === j ? " on" : ""), type: "button", title: axisLabel(lastKind, q) || `인덱스 ${q}` },
+        const c = h("button", { class: "chip" + (q === j ? " on" : ""), type: "button", title: axisLabel(lastKind, q) || `Index ${q}` },
           h("span", { class: "chip-i" }, String(q)), h("span", { class: "chip-v" }, ST.fmt(row[q], 4)));
         if (q !== j) c.onclick = () => value(t, start + q, o);
         chips.appendChild(c);
       }
-      el.appendChild(sec(`이웃 (마지막 축 ±6)`, chips));
+      el.appendChild(sec(`Neighbors (last axis ±6)`, chips));
 
       const s = ST.stats(row);
       const av = Math.abs(v);
       let below = 0;
       for (let q = 0; q < C; q++) if (Math.abs(row[q]) < av) below++;
       const cv = U.canvas("iv-row");
-      const box = sec(`속한 행: 마지막 축 ${C}개`, U.kv([
+      const box = sec(`Its row: ${C} values along the last axis`, U.kv([
         ["min / max", `${ST.fmt(s.min)} / ${ST.fmt(s.max)}`],
-        ["평균 · 표준편차", `${ST.fmt(s.mean)} · ${ST.fmt(s.std)}`],
-        ["RMS · L2 노름", `${ST.fmt(s.rms)} · ${ST.fmt(s.norm)}`],
-        ["|x| 최댓값", `${ST.fmt(s.absmax)} @ ${s.argabsmax}`],
-        ["첨도 (정규분포 = 3)", ST.fmt(s.kurt, 4)],
-        ["이 값의 |x| 백분위", U.pct(below / C, 1)],
+        ["Mean · std", `${ST.fmt(s.mean)} · ${ST.fmt(s.std)}`],
+        ["RMS · L2 norm", `${ST.fmt(s.rms)} · ${ST.fmt(s.norm)}`],
+        ["max |x|", `${ST.fmt(s.absmax)} @ ${s.argabsmax}`],
+        ["Kurtosis (normal = 3)", ST.fmt(s.kurt, 4)],
+        ["|x| percentile of this value", U.pct(below / C, 1)],
       ], "tight"), cv);
       el.appendChild(box);
       requestAnimationFrame(() => {
         if (!alive()) return;
         Charts.line(cv, { W: U.width(box, 340), H: 130, series: [{ y: row, color: Charts.css("--accent"), width: 1 }],
-          marks: [{ x: j }], xlabel: "인덱스", xname: (x) => axisLabel(lastKind, x) || `인덱스 ${x}`,
+          marks: [{ x: j }], xlabel: "index", xname: (x) => axisLabel(lastKind, x) || `Index ${x}`,
           onPick: (hh) => value(t, start + hh.i, o) });
       });
       if (!isInt(dt) && s.absmax > 0 && Number.isFinite(v)) {
         const sc = s.absmax / 127, q = Math.max(-127, Math.min(127, Math.round(v / sc))), dq = q * sc;
-        el.appendChild(sec("INT8 대칭 양자화 (이 행의 absmax/127 스케일)", U.kv([
-          ["스케일 Δ", ST.fmt(sc, 5)], ["q = round(x/Δ)", String(q)],
-          ["역양자화 q·Δ", `${ST.fmt(dq, 6)} <span class="muted">오차 ${ST.fmt(dq - v, 3)} (${ST.fmt(Math.abs(dq - v) / sc, 3)} Δ)</span>`],
-        ], "tight"), U.note("행 하나를 토큰 단위(per-token) 스케일로 양자화했을 때의 모습입니다. 실제 SQNR 비교는 분석 → SQNR 탭에 있습니다.", "small")));
+        el.appendChild(sec("INT8 symmetric quantization (scale = absmax/127 of this row)", U.kv([
+          ["Scale Δ", ST.fmt(sc, 5)], ["q = round(x/Δ)", String(q)],
+          ["Dequantized q·Δ", `${ST.fmt(dq, 6)} <span class="muted">error ${ST.fmt(dq - v, 3)} (${ST.fmt(Math.abs(dq - v) / sc, 3)} Δ)</span>`],
+        ], "tight"), U.note("This is how this row looks when quantized with a per-token scale. The actual SQNR comparison is in the Analysis tools → Quantization SQNR tab.", "small")));
       }
     }
 
     const links = h("div", { class: "links" });
-    if (t.url) links.appendChild(U.button("텐서 열기", () => open(t.url, t.key, { sel: coord }), "", "이 값이 들어 있는 텐서를 창 단위로 엽니다"));
-    else if (t.data.length > 1) links.appendChild(U.button("계산값 전체 보기", () => openData(t, { sel: coord }), ""));
-    links.appendChild(U.button("값 복사", () => U.copy(`${t.key}[${coord.join(",")}] = ${isInt(dt) ? v : ST.exact(v, dt)}`).then(() => U.toast("복사했습니다")), "ghost"));
+    if (t.url) links.appendChild(U.button("Open tensor", () => open(t.url, t.key, { sel: coord }), "", "Open the tensor that holds this value, window by window"));
+    else if (t.data.length > 1) links.appendChild(U.button("View all computed values", () => openData(t, { sel: coord }), ""));
+    links.appendChild(U.button("Copy value", () => U.copy(`${t.key}[${coord.join(",")}] = ${isInt(dt) ? v : ST.exact(v, dt)}`).then(() => U.toast("Copied")), "ghost"));
     for (const [label, fn] of o.links || []) links.appendChild(U.button(label, fn, "ghost"));
     el.appendChild(links);
   }
@@ -461,7 +461,7 @@ const Insp = (() => {
   function srcData(t) {
     const full = t.full || t.shape;
     return {
-      url: null, key: t.key || "계산값",
+      url: null, key: t.key || "computed",
       info: async () => ({ dtype: t.dtype, shape: full }),
       read: async (index, rows) => {
         const strides = new Array(full.length);
@@ -475,7 +475,7 @@ const Insp = (() => {
           const a = Math.max(0, rows[0]), b = Math.min(rest[0], rows[1]);
           off += a * strides[index.length]; count = (b - a) * strides[index.length]; rest[0] = b - a; rr = [a, b];
         }
-        return { dtype: t.dtype, shape: rest, full, url: null, key: t.key || "계산값", index, rows: rr,
+        return { dtype: t.dtype, shape: rest, full, url: null, key: t.key || "computed", index, rows: rr,
           data: t.data.subarray(off, off + count), bits: t.bits ? t.bits.subarray(off, off + count) : null };
       },
     };
@@ -485,18 +485,18 @@ const Insp = (() => {
     show({ title: o.label || `${esc(D.short(url))} · ${esc(key)}`, render: (el, alive) => renderTensor(el, alive, srcURL(url, key), o) });
   }
   function openData(t, o = {}) {
-    show({ title: o.label || `계산값 · ${esc(t.key || "")}`, render: (el, alive) => renderTensor(el, alive, srcData(t), o) });
+    show({ title: o.label || `computed · ${esc(t.key || "")}`, render: (el, alive) => renderTensor(el, alive, srcData(t), o) });
   }
 
   async function renderTensor(el, alive, src, o) {
     const info = await src.info();
-    if (!info) throw new Error(`${src.key} 없음`);
+    if (!info) throw new Error(`${src.key} not found`);
     if (!alive()) return;
     const full = info.shape, dt = info.dtype, nd = full.length;
     const K = kinds(src.url, src.key, full);
     const bytes = prod(full) * (ST.SIZE[dt] || 4);
     el.appendChild(h("div", { class: "iv-sub" }, U.badge(dt), " ", h("span", { class: "mono" }, `[${full.join(", ")}]`),
-      h("span", { class: "muted" }, `  ${ST.fmt(prod(full))}개 · ${ST.bytes(bytes)}`)));
+      h("span", { class: "muted" }, `  n = ${ST.fmt(prod(full))} · ${ST.bytes(bytes)}`)));
     if (o.note) el.appendChild(U.note(o.note));
     if (nd === 0) {
       const t = await src.read([], null);
@@ -526,8 +526,8 @@ const Insp = (() => {
     const drawCtl = () => {
       ctl.innerHTML = "";
       if (nd > 1) {
-        ctl.appendChild(h("label", { class: "ctl" }, "고정할 앞 축 ",
-          U.select(Array.from({ length: nd }, (_, s) => [s, s === 0 ? "없음" : `${s}개`]), S.split, (s) => {
+        ctl.appendChild(h("label", { class: "ctl" }, "Fixed leading axes ",
+          U.select(Array.from({ length: nd }, (_, s) => [s, s === 0 ? "none" : `${s}`]), S.split, (s) => {
             S.split = s; S.whole = false; S.a = 0; S.tr = 0; S.tc = 0; setIdx(); drawCtl(); draw();
           })));
       }
@@ -539,7 +539,7 @@ const Insp = (() => {
           S.idx[d] = v; inp.value = v; lab.textContent = axisLabel(K[d], v) || ""; draw();
         };
         inp.onchange = () => set(+inp.value);
-        ctl.appendChild(h("div", { class: "ctl dim" }, `축 ${d} (${full[d]}) `,
+        ctl.appendChild(h("div", { class: "ctl dim" }, `Axis ${d} (${full[d]}) `,
           U.button("◀", () => set(S.idx[d] - 1), "small"), inp, U.button("▶", () => set(S.idx[d] + 1), "small"), lab));
       }
     };
@@ -558,16 +558,16 @@ const Insp = (() => {
 
       // window control
       if (!whole || S.whole) {
-        const bar = h("div", { class: "ctl win" }, `행 ${a0}–${a0 + nr - 1} / ${R()} `);
+        const bar = h("div", { class: "ctl win" }, `Rows ${a0}–${a0 + nr - 1} / ${R()} `);
         if (!S.whole) {
           bar.append(U.button("◀◀", () => { S.a = 0; draw(); }, "small"), U.button("◀", () => { S.a = Math.max(0, S.a - n); draw(); }, "small"),
             U.button("▶", () => { S.a = Math.min(R() - n, S.a + n); draw(); }, "small"), U.button("▶▶", () => { S.a = R() - n; draw(); }, "small"));
           const winBytes = R() * nc * (ST.SIZE[dt] || 4);
-          bar.appendChild(U.button("전체 로드", () => {
-            if (winBytes > 64 * 1024 * 1024 && !confirm(`${ST.bytes(winBytes)}를 한 번에 읽습니다. 계속할까요?`)) return;
+          bar.appendChild(U.button("Load all", () => {
+            if (winBytes > 64 * 1024 * 1024 && !confirm(`This reads ${ST.bytes(winBytes)} at once. Continue?`)) return;
             S.whole = true; S.a = 0; draw();
           }, "small ghost", `${ST.bytes(winBytes)}`));
-        } else bar.appendChild(U.button("창으로 보기", () => { S.whole = false; draw(); }, "small ghost"));
+        } else bar.appendChild(U.button("Window view", () => { S.whole = false; draw(); }, "small ghost"));
         view.appendChild(bar);
       }
 
@@ -579,7 +579,7 @@ const Insp = (() => {
       view.insertBefore(picTools, pic);
       const nonneg = s.min >= 0;
       if (S.mode === null) S.mode = nonneg ? "val" : "sym";
-      const modes = nonneg ? [["val", "값"], ["log", "log"]] : [["sym", "부호"], ["abs", "|x|"], ["log", "log|x|"]];
+      const modes = nonneg ? [["val", "value"], ["log", "log"]] : [["sym", "signed"], ["abs", "|x|"], ["log", "log|x|"]];
       if (!modes.some((m) => m[0] === S.mode)) S.mode = modes[0][0];
       const isVec = nc === 1 || nr === 1;
       if (!isVec) picTools.appendChild(U.seg(modes, S.mode, (m) => { S.mode = m; drawPic(); }));
@@ -593,7 +593,7 @@ const Insp = (() => {
           const lk = nc === 1 ? K[S.split] : K[nd - 1];
           Charts.line(cv, { W, H: 150, series: [{ y, x: xs, color: Charts.css("--accent"), width: 1 }],
             marks: selFlat >= 0 ? [{ x: nc === 1 ? a0 + selFlat : selFlat }] : [],
-            xname: (x, q) => axisLabel(lk, nc === 1 ? a0 + q : q) || `인덱스 ${nc === 1 ? a0 + q : q}`,
+            xname: (x, q) => axisLabel(lk, nc === 1 ? a0 + q : q) || `Index ${nc === 1 ? a0 + q : q}`,
             onPick: (hh) => value(t, hh.i) });
           return;
         }
@@ -613,7 +613,7 @@ const Insp = (() => {
           onHover: (hh) => {
             const rr = a0 + hh.r, cc = tail.length > 1 ? unravel(hh.c, tail).join(",") : hh.c;
             const rl = axisLabel(rk, rr), cl = ck ? axisLabel(ck, hh.c) : null;
-            return `행 ${rr}${rl ? ` · ${esc(rl)}` : ""}<br>열 ${cc}${cl ? ` · ${esc(cl)}` : ""}<br><b>${ST.fmt(t.data[hh.r * nc + hh.c], 6)}</b>`;
+            return `Row ${rr}${rl ? ` · ${esc(rl)}` : ""}<br>Col ${cc}${cl ? ` · ${esc(cl)}` : ""}<br><b>${ST.fmt(t.data[hh.r * nc + hh.c], 6)}</b>`;
           },
           onPick: (hh) => value(t, hh.r * nc + hh.c) });
       };
@@ -644,16 +644,16 @@ const Insp = (() => {
           U.button("▼", () => { S.tr = Math.min(Math.max(0, nr - 1) - (Math.max(0, nr - 1) % TR), S.tr + TR); drawTbl(); }, "small"),
           U.button("◀", () => { S.tc = Math.max(0, S.tc - TC); drawTbl(); }, "small"),
           U.button("▶", () => { S.tc = Math.min(Math.max(0, nc - 1) - (Math.max(0, nc - 1) % TC), S.tc + TC); drawTbl(); }, "small"),
-          h("span", { class: "muted" }, ` 행 ${a0 + r0}–${a0 + r1 - 1}, 열 ${c0}–${c1 - 1}`));
-        const jump = h("input", { type: "number", min: 0, max: nc - 1, value: c0, class: "num", title: "열 이동" });
+          h("span", { class: "muted" }, ` rows ${a0 + r0}–${a0 + r1 - 1}, cols ${c0}–${c1 - 1}`));
+        const jump = h("input", { type: "number", min: 0, max: nc - 1, value: c0, class: "num", title: "Go to column" });
         jump.onchange = () => { S.tc = Math.max(0, Math.min(nc - 1, +jump.value | 0)); S.tc -= S.tc % TC; drawTbl(); };
-        if (nc > TC) nav.append(" 열 ", jump);
+        if (nc > TC) nav.append(" Column ", jump);
         tbl.append(nav, U.table(head, rowsHTML, { cls: "num-tbl" }));
       };
       drawTbl();
 
       // stats
-      const statBox = h("div", { class: "isec" }, h("div", { class: "isec-h" }, whole ? "통계 (전체)" : `통계 (현재 창: 행 ${a0}–${a0 + nr - 1})`));
+      const statBox = h("div", { class: "isec" }, h("div", { class: "isec-h" }, whole ? "Stats (all)" : `Stats (current window: rows ${a0}–${a0 + nr - 1})`));
       view.appendChild(statBox);
       const amc = s.argabsmax >= 0 ? coordOf(t, s.argabsmax) : null;
       const amBtn = amc ? h("a", { href: "#", class: "mono" }, `[${amc.join(",")}]`) : "–";
@@ -661,33 +661,33 @@ const Insp = (() => {
       statBox.appendChild(U.kv([
         ["n", `${ST.fmt(s.cnt)}${s.nan ? ` · NaN ${s.nan}` : ""}${s.inf ? ` · Inf ${s.inf}` : ""}`],
         ["min / max", `${ST.fmt(s.min)} / ${ST.fmt(s.max)}`],
-        ["평균 · 표준편차", `${ST.fmt(s.mean)} · ${ST.fmt(s.std)}`],
+        ["Mean · std", `${ST.fmt(s.mean)} · ${ST.fmt(s.std)}`],
         ["RMS", ST.fmt(s.rms)],
-        ["|x| 최댓값", h("span", {}, ST.fmt(s.absmax) + " @ ", amBtn)],
-        ["첨도", ST.fmt(s.kurt, 4)],
+        ["max |x|", h("span", {}, ST.fmt(s.absmax) + " @ ", amBtn)],
+        ["Kurtosis", ST.fmt(s.kurt, 4)],
       ], "tight"));
       const hcv = U.canvas();
-      const htools = U.seg([["lin", "선형"], ["log2", "log₂|x|"]], S.hmode, (m) => { S.hmode = m; drawHist(); });
+      const htools = U.seg([["lin", "linear"], ["log2", "log₂|x|"]], S.hmode, (m) => { S.hmode = m; drawHist(); });
       statBox.append(htools, hcv);
       const drawHist = () => {
         const W = U.width(view, 340);
         if (S.hmode === "lin") {
           const lo = s.min, hi = s.max > s.min ? s.max : s.min + 1;
           const cnt = ST.histogram(t.data, 64, lo, hi);
-          Charts.hist(hcv, { W, H: 120, counts: cnt, lo, hi, logCount: true, xlabel: "값" });
+          Charts.hist(hcv, { W, H: 120, counts: cnt, lo, hi, logCount: true, xlabel: "value" });
         } else {
           let mnz = Infinity;
           for (let q = 0; q < t.data.length; q++) { const x = Math.abs(t.data[q]); if (x > 0 && x < mnz) mnz = x; }
           const lo = Number.isFinite(mnz) ? Math.max(-40, Math.floor(Math.log2(mnz))) : -24, hi = s.absmax > 0 ? Math.min(40, Math.ceil(Math.log2(s.absmax)) + 1) : lo + 1;
           const cnt = ST.histogram(t.data, 64, lo, hi, true);
-          Charts.hist(hcv, { W, H: 120, counts: cnt, lo, hi, logCount: true, xlabel: "log₂|x| (0은 최하위 칸)", xfmt: (x) => `2^${Math.round(x)}` });
+          Charts.hist(hcv, { W, H: 120, counts: cnt, lo, hi, logCount: true, xlabel: "log₂|x| (0 goes in the lowest bin)", xfmt: (x) => `2^${Math.round(x)}` });
         }
       };
       requestAnimationFrame(() => { if (alive()) drawHist(); });
 
       const top = ST.topk(t.data, 16, true);
-      statBox.appendChild(h("div", { class: "isec-h" }, "|x| 상위 16"));
-      statBox.appendChild(U.table(["좌표", "값", "의미"], top.map((q) => {
+      statBox.appendChild(h("div", { class: "isec-h" }, "Top 16 by |x|"));
+      statBox.appendChild(U.table(["Coordinate", "Value", "Meaning"], top.map((q) => {
         const c = coordOf(t, q);
         const lab = c.map((x, d) => axisLabel(K[d], x)).filter(Boolean).join(" · ");
         return [`<span class="mono">[${c.join(",")}]</span>`, `<span class="mono">${esc(ST.fmt(t.data[q], 6))}</span>`, `<span class="muted small">${esc(lab)}</span>`];
@@ -696,19 +696,19 @@ const Insp = (() => {
       // whole-slice statistics, streamed chunk by chunk
       if (!whole) {
         const fs = h("div", { class: "fullstats" });
-        const go = U.button("전체 통계 계산 (청크 스트리밍)", () => fullStats(fs, go, alive, src, S.idx.slice(), R(), nc, K, full, S.split), "small");
+        const go = U.button("Compute full stats (chunked streaming)", () => fullStats(fs, go, alive, src, S.idx.slice(), R(), nc, K, full, S.split), "small");
         statBox.append(go, fs);
       }
 
       // copy
       const cp = h("div", { class: "links" },
-        U.button("TSV 복사", () => {
-          if (t.data.length > COPY_MAX) { U.toast(`${ST.fmt(COPY_MAX)}개 이하 창만 복사합니다`); return; }
+        U.button("Copy TSV", () => {
+          if (t.data.length > COPY_MAX) { U.toast(`Only windows of ${ST.fmt(COPY_MAX)} values or fewer can be copied`); return; }
           const lines = [];
           for (let r = 0; r < nr; r++) lines.push([a0 + r, ...Array.from(t.data.subarray(r * nc, (r + 1) * nc), (x) => (isInt(dt) ? x : ST.exact(x, dt)))].join("\t"));
-          U.copy(lines.join("\n")).then(() => U.toast(`${nr}행 복사`));
+          U.copy(lines.join("\n")).then(() => U.toast(`Copied the ${nr}-row window`));
         }, "ghost small"),
-        U.button("통계 JSON 복사", () => U.copy(JSON.stringify({ file: src.url ? D.short(src.url) : null, key: src.key, dtype: dt, shape: full, index: S.idx, rows: t.rows, stats: s }, null, 1)).then(() => U.toast("복사했습니다")), "ghost small"));
+        U.button("Copy stats JSON", () => U.copy(JSON.stringify({ file: src.url ? D.short(src.url) : null, key: src.key, dtype: dt, shape: full, index: S.idx, rows: t.rows, stats: s }, null, 1)).then(() => U.toast("Copied")), "ghost small"));
       view.appendChild(cp);
     };
     drawCtl();
@@ -729,7 +729,7 @@ const Insp = (() => {
     btn.disabled = true;
     let cancel = false;
     const prog = h("span", { class: "muted" }, "0%");
-    const stop = U.button("중지", () => { cancel = true; }, "small ghost");
+    const stop = U.button("Stop", () => { cancel = true; }, "small ghost");
     box.innerHTML = "";
     box.append(prog, " ", stop);
     const per = Math.max(1, Math.floor(1_000_000 / Math.max(1, nc)));
@@ -765,19 +765,19 @@ const Insp = (() => {
     stop.remove();
     const mean = s1 / n, m2 = s2 / n - mean * mean;
     const m4 = s4 / n - 4 * mean * (s3 / n) + 6 * mean * mean * (s2 / n) - 3 * mean ** 4;
-    prog.textContent = cancel ? "중지됨 (부분 결과)" : "완료";
+    prog.textContent = cancel ? "Stopped (partial result)" : "Done";
     box.appendChild(U.kv([
       ["n", `${ST.fmt(n)}${nan ? ` · NaN ${nan}` : ""}${inf ? ` · Inf ${inf}` : ""}`],
       ["min / max", `${ST.fmt(mn)} / ${ST.fmt(mx)}`],
-      ["평균 · 표준편차", `${ST.fmt(mean)} · ${ST.fmt(Math.sqrt(Math.max(0, m2)))}`],
+      ["Mean · std", `${ST.fmt(mean)} · ${ST.fmt(Math.sqrt(Math.max(0, m2)))}`],
       ["RMS", ST.fmt(Math.sqrt(s2 / n))],
-      ["|x| 최댓값", `${ST.fmt(am)} @ [${amAt ? amAt.join(",") : ""}]`],
-      ["첨도", ST.fmt(m2 > 0 ? m4 / (m2 * m2) : NaN, 4)],
+      ["max |x|", `${ST.fmt(am)} @ [${amAt ? amAt.join(",") : ""}]`],
+      ["Kurtosis", ST.fmt(m2 > 0 ? m4 / (m2 * m2) : NaN, 4)],
     ], "tight"));
     const cv = U.canvas();
     box.appendChild(cv);
     Charts.hist(cv, { W: U.width(box, 340), H: 110, counts: lh, lo: LO, hi: HI, logCount: true, xlabel: "log₂|x|", xfmt: (x) => `2^${Math.round(x)}` });
-    box.appendChild(U.table(["좌표", "값", "의미"], top.map(([, v, c]) => [
+    box.appendChild(U.table(["Coordinate", "Value", "Meaning"], top.map(([, v, c]) => [
       `<span class="mono">[${c.join(",")}]</span>`, `<span class="mono">${esc(ST.fmt(v, 6))}</span>`,
       `<span class="muted small">${esc(c.map((x, d) => axisLabel(K[d], x)).filter(Boolean).join(" · "))}</span>`]),
     { cls: "small", onRow: (k) => { if (src.url) open(src.url, src.key, { sel: top[k][2] }); } }));

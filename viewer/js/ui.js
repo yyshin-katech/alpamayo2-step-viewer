@@ -138,11 +138,11 @@ const U = (() => {
   const tokHTML = (s) => `<span class="tok">${esc(s)}</span>`;
 
   /** "loading" placeholder that stages replace. */
-  function wait(text = "불러오는 중…") { return h("div", { class: "wait" }, text); }
+  function wait(text = "Loading…") { return h("div", { class: "wait" }, text); }
 
   function err(e) {
     console.error(e);
-    return h("div", { class: "error" }, "오류: " + (e && e.message ? e.message : String(e)));
+    return h("div", { class: "error" }, "Error: " + (e && e.message ? e.message : String(e)));
   }
 
   return { h, esc, card, seg, select, slider, button, kv, table, canvas, note, badge, copy, toast, width, f, pct, tokHTML, wait, err };

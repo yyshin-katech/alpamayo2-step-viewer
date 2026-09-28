@@ -9,12 +9,12 @@
   const NB = 27;
   /** View modes kept while the page is open. */
   const UIB = { imap: "norm", alog: true, mlog: true, amap: "recv", umap: "ratio", neuron: -1 };
-  const INT_NAMES = { norm1: "LN₁ 출력", qkv: "qkv", q: "q (RoPE 후)", k: "k (RoPE 후)", v: "v", ctx: "어텐션 출력 ctx", proj: "proj",
-    mid: "mid = x + proj", norm2: "LN₂ 출력", fc1: "fc1", act: "GELU", fc2: "fc2", out: "out = mid + fc2" };
-  const qkvName = (c) => `${"qkv"[Math.floor(c / 1152)]} · 헤드 ${Math.floor((c % 1152) / 72)} · d ${c % 72}`;
-  const headName = (c) => `헤드 ${Math.floor(c / 72)} · d ${c % 72}`;
+  const INT_NAMES = { norm1: "LN₁ output", qkv: "qkv", q: "q (after RoPE)", k: "k (after RoPE)", v: "v", ctx: "Attention output ctx", proj: "proj",
+    mid: "mid = x + proj", norm2: "LN₂ output", fc1: "fc1", act: "GELU", fc2: "fc2", out: "out = mid + fc2" };
+  const qkvName = (c) => `${"qkv"[Math.floor(c / 1152)]} · head ${Math.floor((c % 1152) / 72)} · d ${c % 72}`;
+  const headName = (c) => `head ${Math.floor(c / 72)} · d ${c % 72}`;
   const headLines = () => Array.from({ length: 15 }, (_, i) => ({ c: 72 * (i + 1), color: Charts.css("--grid") || "#ccc" }));
-  const stageName = (s) => (s === 0 ? "patch_out" : s === 1 ? "after_pos (+pos)" : `블록 ${s - 2} 출력`);
+  const stageName = (s) => (s === 0 ? "patch_out" : s === 1 ? "after_pos (+pos)" : `Block ${s - 2} output`);
   function goStage(ctx, s) { if (s === 0) ctx.go("patch"); else if (s === 1) ctx.go("pos"); else ctx.go("vblock", s - 2, ctx.detail ? 4 : -1); }
 
   /** Rows of patch p of block b: "x" = block input (global row), "out" = block output (global row), others = internals. */
@@ -44,16 +44,16 @@
   // ================================================================ render
   function render(el, ctx, b, sub) {
     const p = ctx.sel.patch, [r, c] = D.patchRC(p);
-    const T = ["전체 흐름", ...SG.SUBS.vblock];
+    const T = ["Full flow", ...SG.SUBS.vblock];
     const cards = SG.head(el, {
-      kind: "vblock", kicker: `3 · 비전 인코더 · 블록 ${b} / ${NB - 1}`,
-      title: `비전 블록 ${b} — ${esc(T[sub + 1])}`,
-      desc: "ViT 블록 = 사전 정규화(pre-LN) 트랜스포머 층입니다. 어텐션은 이미지 안의 720패치끼리만(이미지마다 따로, cu_seqlens) 비인과로 봅니다. " +
-        "잔차 덧셈 두 번은 bf16, LayerNorm은 fp32로 계산됩니다. 아래 값은 초점 이미지 " + SV.FK() + ` (${esc(SV.camTitle(SV.FK()))})의 패치 ${p} (행 ${r}, 열 ${c})입니다.`,
+      kind: "vblock", kicker: `3 · Vision encoder · Block ${b} / ${NB - 1}`,
+      title: `Vision block ${b} — ${esc(T[sub + 1])}`,
+      desc: "A ViT block is a pre-normalization (pre-LN) transformer layer. Attention is non-causal and only among the 720 patches within an image (each image separately, cu_seqlens). " +
+        "The two residual additions are computed in bf16 and LayerNorm in fp32. The values below are from focal image " + SV.FK() + ` (${esc(SV.camTitle(SV.FK()))}), patch ${p} (row ${r}, col ${c}).`,
       formula: "mid = x + proj( Attn( LN₁(x) ) )   ·   out = mid + fc2( GELU_tanh( fc1( LN₂(mid) ) ) )",
-      badges: [SG.check("vision.residual_adds_bitwise.focal", "잔차 덧셈 비트 일치 (27블록)"), SG.check("vision.attn_rows_sum_to_1", "어텐션 행 합 = 1"),
+      badges: [SG.check("vision.residual_adds_bitwise.focal", "Residual additions bit-exact (27 blocks)"), SG.check("vision.attn_rows_sum_to_1", "Attention row sums = 1"),
         SG.check("vision.attn_recompute_times_v_matches_ctx", "attn · v = ctx")],
-      nav: h("div", { class: "row-tools" }, SG.subNav(ctx, "vblock", b, sub), SG.layerNav(ctx, "vblock", b, NB, sub, "블록"), SV.imgSelect(ctx), SV.patchPicker(ctx)),
+      nav: h("div", { class: "row-tools" }, SG.subNav(ctx, "vblock", b, sub), SG.layerNav(ctx, "vblock", b, NB, sub, "Block"), SV.imgSelect(ctx), SV.patchPicker(ctx)),
     });
     const fb = SV.focalBanner(ctx);
     if (fb) cards.appendChild(fb);
@@ -63,58 +63,58 @@
 
   // ================================================================ -1 · whole flow
   function overview(cards, ctx, b, p) {
-    SG.lazy(cards, ctx, `계산 흐름 — 블록 ${b} · 패치 ${p}`, { wide: true,
-      sub: "줄마다 이름을 누르면 텐서 전체가, 띠의 칸을 누르면 그 값이 인스펙터에 열립니다. 배지는 브라우저에서 같은 순서로 다시 계산해 비교한 결과입니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Computation flow — block ${b} · patch ${p}`, { wide: true,
+      sub: "Click the name on a row to open the whole tensor in the inspector, or a cell of the strip to open that value. Badges show comparisons with a recomputation done in the browser in the same order." }, async (body) => {
       const t = await readRow(ctx, b, p, ["x", "norm1", "qkv", "q", "k", "v", "ctx", "proj", "mid", "norm2", "fc1", "act", "fc2", "out"]);
       const [cs, sn] = await Promise.all([ctx.read(D.F.vio, "cos", { rows: [p, p + 1] }), ctx.read(D.F.vio, "sin", { rows: [p, p + 1] })]);
       const fr = SV.FROW() + p, hl = headLines();
       SG.flowRow(body, { t: t.x, name: `x = ${SV.xInName(b)}`, sel: [fr, 0], shape: "BF16 · 1152" });
-      SG.arrow(body, "LayerNorm₁ (1152, eps 1e-6) — fp32로 계산·출력");
+      SG.arrow(body, "LayerNorm₁ (1152, eps 1e-6) — computed and output in fp32");
       SG.flowRow(body, { t: t.norm1, name: "norm1", sel: [p, 0], shape: "F32 · 1152" });
       SG.arrow(body, "qkv = Linear(1152 → 3456, bias) — bf16");
       SG.flowRow(body, { t: t.qkv, name: "qkv", sel: [p, 0], shape: "BF16 · 3456 = q | k | v", vlines: [{ c: 1152 }, { c: 2304 }], colName: qkvName });
-      SG.arrow(body, "q, k에 2D RoPE (행·열 각도) · v는 그대로 · 헤드 16 × 72");
+      SG.arrow(body, "2D RoPE on q, k (row and column angles) · v unchanged · 16 heads × 72");
       SG.flowRow(body, { t: t.q, name: "q", sel: [p, 0, 0], shape: "BF16 · 16 × 72", vlines: hl, colName: headName,
-        badge: SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 0), t.q), "RoPE 재계산", { formula: "bf16( q·cos + rotate_half(q)·sin ), fp32 계산", open: (i) => Insp.value(t.q, i) }) });
+        badge: SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 0), t.q), "RoPE recompute", { formula: "bf16( q·cos + rotate_half(q)·sin ), computed in fp32", open: (i) => Insp.value(t.q, i) }) });
       SG.flowRow(body, { t: t.k, name: "k", sel: [p, 0, 0], shape: "BF16 · 16 × 72", vlines: hl, colName: headName,
-        badge: SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 1), t.k), "RoPE 재계산", { formula: "bf16( k·cos + rotate_half(k)·sin )", open: (i) => Insp.value(t.k, i) }) });
+        badge: SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 1), t.k), "RoPE recompute", { formula: "bf16( k·cos + rotate_half(k)·sin )", open: (i) => Insp.value(t.k, i) }) });
       SG.flowRow(body, { t: t.v, name: "v", sel: [p, 0, 0], shape: "BF16 · 16 × 72", vlines: hl, colName: headName,
-        badge: SG.cmpBadge(SG.cmp(sliceT(t.qkv, "qkv[2304:]", 2304, 3456, [1, 1152]), t.v), "v = qkv 뒤 1/3") });
-      SG.arrow(body, "헤드마다 softmax(q·kᵀ / √72) · v — 같은 이미지 720패치 (비인과)");
+        badge: SG.cmpBadge(SG.cmp(sliceT(t.qkv, "qkv[2304:]", 2304, 3456, [1, 1152]), t.v), "v = last 1/3 of qkv") });
+      SG.arrow(body, "Per head, softmax(q·kᵀ / √72) · v — 720 patches of the same image (non-causal)");
       SG.flowRow(body, { t: t.ctx, name: "ctx", sel: [p, 0, 0], shape: "BF16 · 16 × 72", vlines: hl, colName: headName });
       SG.arrow(body, "proj = Linear(1152 → 1152, bias)");
       SG.flowRow(body, { t: t.proj, name: "proj", sel: [p, 0], shape: "BF16 · 1152" });
-      SG.arrow(body, "mid = x + proj (bf16 덧셈)");
+      SG.arrow(body, "mid = x + proj (bf16 addition)");
       SG.flowRow(body, { t: t.mid, name: "mid", sel: [p, 0], shape: "BF16 · 1152",
-        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("x + proj", [1, 1152], SV.addWords(t.x.data, t.proj.data)), t.mid), "잔차 재계산",
+        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("x + proj", [1, 1152], SV.addWords(t.x.data, t.proj.data)), t.mid), "Residual recompute",
           { formula: "bf16( fp32(x) + fp32(proj) )", open: (i) => Insp.value(t.mid, i) }) });
       SG.arrow(body, "LayerNorm₂ (fp32)");
       SG.flowRow(body, { t: t.norm2, name: "norm2", sel: [p, 0], shape: "F32 · 1152" });
       SG.arrow(body, "fc1 = Linear(1152 → 4304)");
       SG.flowRow(body, { t: t.fc1, name: "fc1", sel: [p, 0], shape: "BF16 · 4304" });
-      SG.arrow(body, "GELU (tanh 근사)");
+      SG.arrow(body, "GELU (tanh approximation)");
       SG.flowRow(body, { t: t.act, name: "act", sel: [p, 0], shape: "BF16 · 4304",
-        badge: SG.cmpBadge(SG.cmp(geluRow(t.fc1), t.act), "GELU 재계산", { formula: "bf16( gelu_tanh(fc1) ), fp32 계산", open: (i) => Insp.value(t.act, i) }) });
+        badge: SG.cmpBadge(SG.cmp(geluRow(t.fc1), t.act), "GELU recompute", { formula: "bf16( gelu_tanh(fc1) ), computed in fp32", open: (i) => Insp.value(t.act, i) }) });
       SG.arrow(body, "fc2 = Linear(4304 → 1152)");
       SG.flowRow(body, { t: t.fc2, name: "fc2", sel: [p, 0], shape: "BF16 · 1152" });
-      SG.arrow(body, "out = mid + fc2 (bf16 덧셈)");
+      SG.arrow(body, "out = mid + fc2 (bf16 addition)");
       SG.flowRow(body, { t: t.out, name: "out", sel: [fr, 0], shape: "BF16 · 1152",
-        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("mid + fc2", [1, 1152], SV.addWords(t.mid.data, t.fc2.data)), t.out), "잔차 재계산",
+        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("mid + fc2", [1, 1152], SV.addWords(t.mid.data, t.fc2.data)), t.out), "Residual recompute",
           { formula: "bf16( fp32(mid) + fp32(fc2) )", open: (i) => Insp.value(t.out, i) }) });
       body.appendChild(U.kv([
-        ["‖proj‖ / ‖x‖ (어텐션이 바꾼 양)", ST.fmt(R.norm(t.proj.data) / R.norm(t.x.data), 4)],
-        ["‖fc2‖ / ‖mid‖ (MLP가 바꾼 양)", ST.fmt(R.norm(t.fc2.data) / R.norm(t.mid.data), 4)],
+        ["‖proj‖ / ‖x‖ (change made by attention)", ST.fmt(R.norm(t.proj.data) / R.norm(t.x.data), 4)],
+        ["‖fc2‖ / ‖mid‖ (change made by the MLP)", ST.fmt(R.norm(t.fc2.data) / R.norm(t.mid.data), 4)],
         ["cos(x, out)", ST.fmt(R.cos(t.x.data, t.out.data), 6)],
       ], "tight"));
       body.appendChild(h("div", { class: "links" }, SG.SUBS.vblock.map((s, k) =>
-        U.button(`${k + 1}. ${s} 자세히`, () => (ctx.detail ? ctx.go("vblock", b, k) : ctx.setSel("vsub", k)), "small ghost"))));
+        U.button(`${k + 1}. ${s} in detail`, () => (ctx.detail ? ctx.go("vblock", b, k) : ctx.setSel("vsub", k)), "small ghost"))));
     });
     intCard(cards, ctx, b, p);
     trajCard(cards, ctx, b);
   }
 
   function intCard(cards, ctx, b, p) {
-    SG.lazy(cards, ctx, `중간값 13개의 크기 — 패치 ${p}`, { sub: "막대를 누르면 그 값이 열립니다 (vision_stats.int_norm / int_absmax). 표는 초점 이미지 720패치 전체의 통계 (int_stats)." }, async (body) => {
+    SG.lazy(cards, ctx, `Size of the 13 intermediates — patch ${p}`, { sub: "Click a bar to open its value (vision_stats.int_norm / int_absmax). The table has statistics over all 720 patches of the focal image (int_stats)." }, async (body) => {
       const [nt, at, st] = await Promise.all([ctx.read(D.F.vstats, "int_norm", { index: [b] }), ctx.read(D.F.vstats, "int_absmax", { index: [b] }),
         ctx.read(D.F.vstats, "int_stats", { index: [b] })]);
       const tools = h("div", { class: "row-tools" }), box = h("div");
@@ -132,77 +132,77 @@
       tools.appendChild(U.seg([["norm", "‖x‖ (L2)"], ["absmax", "max|x|"]], UIB.imap, (v) => { UIB.imap = v; draw(); }));
       draw();
       const rows = D.VIS_INT.map((key, q) => [esc(INT_NAMES[key]), ...[0, 1, 2].map((j) => `<span class="mono">${ST.fmt(st.data[q * 3 + j], 4)}</span>`)]);
-      body.appendChild(U.table(["중간값 (720패치 전체)", "max|x|", "RMS", "첨도"], rows, { cls: "small", onRow: (q) => Insp.value(st, q * 3) }));
+      body.appendChild(U.table(["Intermediate (all 720 patches)", "max|x|", "RMS", "Kurtosis"], rows, { cls: "small", onRow: (q) => Insp.value(st, q * 3) }));
     });
   }
 
   function trajCard(cards, ctx, b) {
     const k = ctx.sel.img, p = ctx.sel.patch, gi = k * 720 + p;
-    SG.lazy(cards, ctx, `29단계 궤적 — 이미지 ${k} · 패치 ${p}`, {
-      sub: "patch_out → after_pos → 블록 0–26 출력에서 이 패치 벡터가 어떻게 변하는지 (빨간 선 = 지금 블록). 점을 누르면 그 값과 ‘이 단계로 이동’ 링크가 열립니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Through 29 stages — image ${k} · patch ${p}`, {
+      sub: "How this patch vector changes over patch_out → after_pos → the outputs of blocks 0–26 (red line = current block). Click a point to open its value and a ‘Go to this stage’ link." }, async (body) => {
       const [tn, tu, tc] = await Promise.all(["tok_norm", "tok_upd", "tok_cos_prev"].map((key) => ctx.read(D.F.vstats, key)));
       const col = (t) => { const a = new Float32Array(29); for (let s = 0; s < 29; s++) a[s] = t.data[s * 17280 + gi]; return a; };
       const W = U.width(body, 480), xs = Array.from({ length: 29 }, (_, s) => s);
-      const pick = (t) => (hh) => Insp.value(t, hh.i * 17280 + gi, { links: [["이 단계로 이동", () => goStage(ctx, hh.i)]] });
+      const pick = (t) => (hh) => Insp.value(t, hh.i * 17280 + gi, { links: [["Go to this stage", () => goStage(ctx, hh.i)]] });
       const cv1 = U.canvas(), cv2 = U.canvas();
       body.append(cv1, cv2);
       Charts.line(cv1, { W, H: 140, logy: true, ylabel: "‖x‖", marks: [b + 2], xname: (x, i) => stageName(i),
         series: [{ x: xs, y: col(tn), color: Charts.css("--vis"), width: 1.5, dots: 2, label: "‖x‖" }], onPick: pick(tn) });
-      Charts.line(cv2, { W, H: 140, ymin: 0, ylabel: "비율", marks: [b + 2], xname: (x, i) => stageName(i),
-        series: [{ x: xs, y: col(tu), color: Charts.css("--accent"), width: 1.5, dots: 2, label: "갱신 비율 ‖Δ‖/‖x_prev‖" },
+      Charts.line(cv2, { W, H: 140, ymin: 0, ylabel: "ratio", marks: [b + 2], xname: (x, i) => stageName(i),
+        series: [{ x: xs, y: col(tu), color: Charts.css("--accent"), width: 1.5, dots: 2, label: "Update ratio ‖Δ‖/‖x_prev‖" },
           { x: xs, y: col(tc), color: Charts.css("--muted"), width: 1.5, dots: 2, label: "cos(x, x_prev)" }], onPick: pick(tu) });
-      body.appendChild(U.note("x축 0 = patch_out, 1 = after_pos, 2 + b = 블록 b 출력. 첫 단계에는 이전 값이 없어 갱신 비율·cos가 비어 있습니다.", "small"));
+      body.appendChild(U.note("x axis: 0 = patch_out, 1 = after_pos, 2 + b = output of block b. The first stage has no previous value, so its update ratio and cos are empty.", "small"));
     });
   }
 
   // ================================================================ 0 · LN1 → QKV → RoPE
   function sub0(cards, ctx, b, p) {
-    SG.lazy(cards, ctx, `LayerNorm₁ — 패치 ${p}`, { wide: true }, async (body) => {
+    SG.lazy(cards, ctx, `LayerNorm₁ — patch ${p}`, { wide: true }, async (body) => {
       const t = await readRow(ctx, b, p, ["x", "norm1"]);
       SG.flowRow(body, { t: t.x, name: `x = ${SV.xInName(b)}`, sel: [SV.FROW() + p, 0], shape: "BF16 · 1152" });
-      SG.arrow(body, "(x − 평균) / √(분산 + 1e-6) · γ + β — fp32");
+      SG.arrow(body, "(x − mean) / √(variance + 1e-6) · γ + β — fp32");
       SG.flowRow(body, { t: t.norm1, name: "norm1", sel: [p, 0], shape: "F32 · 1152" });
       const sx = ST.stats(t.x.data), sy = ST.stats(t.norm1.data);
-      body.appendChild(U.kv([["x 평균 · 표준편차", `${ST.fmt(sx.mean, 4)} · ${ST.fmt(sx.std, 4)}`], ["norm1 평균 · 표준편차", `${ST.fmt(sy.mean, 4)} · ${ST.fmt(sy.std, 4)}`],
-        ["x 최대 |값| 채널", `${sx.argabsmax} (${ST.fmt(t.x.data[sx.argabsmax], 5)})`]], "tight"));
+      body.appendChild(U.kv([["x mean · std", `${ST.fmt(sx.mean, 4)} · ${ST.fmt(sx.std, 4)}`], ["norm1 mean · std", `${ST.fmt(sy.mean, 4)} · ${ST.fmt(sy.std, 4)}`],
+        ["Channel of max |x|", `${sx.argabsmax} (${ST.fmt(t.x.data[sx.argabsmax], 5)})`]], "tight"));
       const out = h("div");
-      const btn = U.button("γ, β 추정 (720패치 회귀)", async () => {
-        btn.disabled = true; btn.textContent = "계산 중…";
+      const btn = U.button("Estimate γ, β (regression over 720 patches)", async () => {
+        btn.disabled = true; btn.textContent = "Computing…";
         try {
           const rows = [SV.FROW(), SV.FROW() + 720];
           const [x, y] = await Promise.all([SV.xIn(ctx, b, rows), ctx.read(D.F.vblock(b), "norm1")]);
           btn.remove();
-          SV.lnView(out, SV.lnEstimate(x.data, y.data, 720, 1152), { name: `블록 ${b} LN₁` });
-        } catch (e) { if (e !== SG.STALE) { btn.disabled = false; btn.textContent = "다시 시도"; out.appendChild(U.err(e)); } }
+          SV.lnView(out, SV.lnEstimate(x.data, y.data, 720, 1152), { name: `Block ${b} LN₁` });
+        } catch (e) { if (e !== SG.STALE) { btn.disabled = false; btn.textContent = "Retry"; out.appendChild(U.err(e)); } }
       }, "small");
       body.append(h("div", { class: "links" }, btn), out);
     });
 
-    SG.lazy(cards, ctx, "QKV 투영 — Linear(1152 → 3456)", { wide: true,
-      sub: "한 번의 곱셈으로 q, k, v를 함께 만들고 헤드 16개 × 72차원으로 나눕니다. 판의 칸을 누르면 qkv의 그 값이 열립니다." }, async (body) => {
+    SG.lazy(cards, ctx, "QKV projection — Linear(1152 → 3456)", { wide: true,
+      sub: "One matrix multiply makes q, k and v together, and they are split into 16 heads × 72 dims. Click a cell in a panel to open the corresponding qkv value." }, async (body) => {
       const { qkv } = await readRow(ctx, b, p, ["qkv"]);
       SG.flowRow(body, { t: qkv, name: "qkv", sel: [p, 0], shape: "BF16 · 3456 = q | k | v", vlines: [{ c: 1152 }, { c: 2304 }], colName: qkvName });
       const grid = h("div", { class: "heats" });
       body.appendChild(grid);
-      for (const [off, name] of [[0, "q (RoPE 전)"], [1152, "k (RoPE 전)"], [2304, "v"]]) {
-        const f = h("div", { class: "heat-f" }, h("div", { class: "small muted" }, `${name} · 헤드 16 × 72`));
+      for (const [off, name] of [[0, "q (before RoPE)"], [1152, "k (before RoPE)"], [2304, "v"]]) {
+        const f = h("div", { class: "heat-f" }, h("div", { class: "small muted" }, `${name} · 16 heads × 72`));
         grid.appendChild(f);
         SV.heat16x72(f, qkv, off, { W: 330, H: 120, name, vlabel: esc(name) });
       }
     });
 
-    SG.lazy(cards, ctx, "2D RoPE — q, k 회전", { wide: true,
-      sub: "쌍 (d, d+36)을 각도 rot[d mod 36]만큼 돌립니다: d < 18은 행 번호, 18 ≤ d < 36은 열 번호에 비례. 회전이라 쌍마다 길이는 그대로입니다 (bf16 반올림만큼만 달라짐)." }, async (body) => {
+    SG.lazy(cards, ctx, "2D RoPE — rotating q, k", { wide: true,
+      sub: "Pair (d, d+36) is rotated by the angle rot[d mod 36], which is proportional to the row index for d < 18 and to the column index for 18 ≤ d < 36. Being a rotation, it keeps the length of each pair (which changes only by bf16 rounding)." }, async (body) => {
       const t = await readRow(ctx, b, p, ["qkv", "q", "k"]);
       const [cs, sn] = await Promise.all([ctx.read(D.F.vio, "cos", { rows: [p, p + 1] }), ctx.read(D.F.vio, "sin", { rows: [p, p + 1] })]);
       const badges = h("div", { class: "st-badges" });
       body.appendChild(badges);
       badges.append(
-        SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 0), t.q), "q = RoPE(qkv의 q)", { formula: "bf16( fp32(q)·cos + rotate_half(fp32(q))·sin )", open: (i) => Insp.value(t.q, i) }),
-        SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 1), t.k), "k = RoPE(qkv의 k)", { formula: "bf16( fp32(k)·cos + rotate_half(fp32(k))·sin )", open: (i) => Insp.value(t.k, i) }));
+        SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 0), t.q), "q = RoPE(q of qkv)", { formula: "bf16( fp32(q)·cos + rotate_half(fp32(q))·sin )", open: (i) => Insp.value(t.q, i) }),
+        SG.cmpBadge(SG.cmp(ropeRow(t.qkv, cs, sn, 1), t.k), "k = RoPE(k of qkv)", { formula: "bf16( fp32(k)·cos + rotate_half(fp32(k))·sin )", open: (i) => Insp.value(t.k, i) }));
       const grid = h("div", { class: "heats" });
       body.appendChild(grid);
-      for (const [tt, name] of [[t.q, "q (RoPE 후)"], [t.k, "k (RoPE 후)"]]) {
+      for (const [tt, name] of [[t.q, "q (after RoPE)"], [t.k, "k (after RoPE)"]]) {
         const f = h("div", { class: "heat-f" }, h("div", { class: "small muted" }, name));
         grid.appendChild(f);
         SV.heat16x72(f, tt, 0, { W: 330, H: 120, name, vlines: [{ c: 18, color: Charts.css("--muted") }, { c: 36, color: Charts.css("--fg") }, { c: 54, color: Charts.css("--muted") }] });
@@ -217,54 +217,54 @@
           }
         }
       }
-      body.appendChild(U.kv([["쌍 길이 변화 최대 |‖회전 후‖/‖회전 전‖ − 1|", `${ST.fmt(worst, 3)} <span class="muted">(bf16 반올림 수준이면 회전이 맞음)</span>`]], "tight"));
+      body.appendChild(U.kv([["Max change in pair length |‖after‖/‖before‖ − 1|", `${ST.fmt(worst, 3)} <span class="muted">(at bf16 rounding level, the rotation is correct)</span>`]], "tight"));
       const hh = Math.max(0, ctx.sel.vhead);
-      const tools = h("div", { class: "row-tools" }, h("span", { class: "small muted" }, "헤드"),
+      const tools = h("div", { class: "row-tools" }, h("span", { class: "small muted" }, "Head"),
         U.seg(Array.from({ length: 16 }, (_, x) => [x, String(x)]), hh, (v) => ctx.setSel("vhead", v)));
       body.appendChild(tools);
       const cv = U.canvas();
       body.appendChild(cv);
       const pre = t.qkv.data.subarray(hh * 72, hh * 72 + 72), post = t.q.data.subarray(hh * 72, hh * 72 + 72);
       Charts.line(cv, { W: U.width(body, 480), H: 150, xlabel: "d", marks: [{ x: 18, color: Charts.css("--muted") }, { x: 36, color: Charts.css("--fg") }, { x: 54, color: Charts.css("--muted") }],
-        series: [{ y: pre, color: Charts.css("--muted"), width: 1, dots: 2, label: `q 헤드 ${hh} RoPE 전` }, { y: post, color: Charts.css("--vis"), width: 1.5, dots: 2, label: "RoPE 후" }],
-        xname: (x) => `d ${x}${x % 36 < 18 ? " · 행 각도" : " · 열 각도"}`, onPick: (e) => Insp.value(t.q, hh * 72 + e.i) });
-      body.appendChild(h("div", { class: "links" }, U.button("RoPE 각도 표 보기 (+pos 단계)", () => ctx.go("pos"), "small ghost")));
+        series: [{ y: pre, color: Charts.css("--muted"), width: 1, dots: 2, label: `q head ${hh} before RoPE` }, { y: post, color: Charts.css("--vis"), width: 1.5, dots: 2, label: "After RoPE" }],
+        xname: (x) => `d ${x}${x % 36 < 18 ? " · row angle" : " · column angle"}`, onPick: (e) => Insp.value(t.q, hh * 72 + e.i) });
+      body.appendChild(h("div", { class: "links" }, U.button("Show RoPE angle tables (+pos step)", () => ctx.go("pos"), "small ghost")));
     });
   }
 
   // ================================================================ 1 · attention
   function sub1(cards, ctx, b, p) {
     const hh = ctx.sel.vhead, B = D.F.vblock(b), FK = SV.FK();
-    const headSeg = () => U.seg([[-1, "평균", "헤드 16개 평균 (vision_attn.attn_mean)"], ...Array.from({ length: 16 }, (_, x) => [x, String(x)])], hh, (v) => ctx.setSel("vhead", v), "heads");
-    const hname = hh < 0 ? "헤드 평균" : `헤드 ${hh}`;
+    const headSeg = () => U.seg([[-1, "Mean", "Mean of the 16 heads (vision_attn.attn_mean)"], ...Array.from({ length: 16 }, (_, x) => [x, String(x)])], hh, (v) => ctx.setSel("vhead", v), "heads");
+    const hname = hh < 0 ? "head mean" : `head ${hh}`;
     const rowOf = (q) => (hh < 0 ? ctx.read(D.F.vattn, "attn_mean", { index: [b], rows: [q, q + 1] }) : ctx.read(B, "attn", { index: [hh], rows: [q, q + 1] }));
 
-    SG.lazy(cards, ctx, `쿼리 패치 ${p}가 보는 곳 — ${hname}`, { wide: true, tools: headSeg(),
-      sub: "softmax(q·kᵀ/√72)의 한 행 = 이 패치(빨간 칸)가 같은 이미지의 720패치에 나눠 준 가중치 (합 1). 칸을 누르면 그 가중치가 열리고, ‘이 키를 쿼리로’를 누르면 그 패치로 옮겨 갑니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Where query patch ${p} looks — ${hname}`, { wide: true, tools: headSeg(),
+      sub: "One row of softmax(q·kᵀ/√72) = the weights this patch (red cell) gives to the 720 patches of the same image (sum 1). Click a cell to open its weight, and click ‘Use this key as query’ to move to that patch." }, async (body) => {
       const t = await rowOf(p), a = t.data;
       const [left, right] = split2(body);
       const tools = h("div", { class: "row-tools" }), gbox = h("div");
       left.append(tools, gbox);
       const draw = () => {
         gbox.innerHTML = "";
-        SG.gridImg(gbox, FK, { vals: a, log: UIB.alog, vmin: UIB.alog ? 1e-5 : 0, alpha: 0.75, sel: [SG.patchSel(p, SV.selColor())], cbLabel: "어텐션 가중치", maxW: 620,
-          onHover: (j) => `키 패치 ${j} · 거리 ${ST.fmt(dist(p, j), 3)}`,
-          onPick: (j) => Insp.value(t, j, { note: `쿼리 ${p} → 키 ${j} (거리 ${ST.fmt(dist(p, j), 3)} 패치)`, links: [["이 키를 쿼리로", () => ctx.setSel("patch", j)]] }) });
+        SG.gridImg(gbox, FK, { vals: a, log: UIB.alog, vmin: UIB.alog ? 1e-5 : 0, alpha: 0.75, sel: [SG.patchSel(p, SV.selColor())], cbLabel: "Attention weight", maxW: 620,
+          onHover: (j) => `Key patch ${j} · distance ${ST.fmt(dist(p, j), 3)}`,
+          onPick: (j) => Insp.value(t, j, { note: `Query ${p} → key ${j} (distance ${ST.fmt(dist(p, j), 3)} patches)`, links: [["Use this key as query", () => ctx.setSel("patch", j)]] }) });
       };
-      tools.appendChild(U.seg([[true, "로그 색"], [false, "선형 색"]], UIB.alog, (v) => { UIB.alog = v; draw(); }));
+      tools.appendChild(U.seg([[true, "Log scale"], [false, "Linear scale"]], UIB.alog, (v) => { UIB.alog = v; draw(); }));
       draw();
       const H = entropy(a);
       let md = 0;
       for (let j = 0; j < 720; j++) md += a[j] * dist(p, j);
       const top = ST.topk(a, 8, false);
       right.appendChild(U.kv([
-        ["엔트로피 H", `${ST.fmt(H, 4)} nats <span class="muted">(균등이면 ln 720 = ${ST.fmt(Math.log(720), 4)})</span>`],
-        ["유효 키 수 e^H", ST.fmt(Math.exp(H), 4)],
-        ["자기 자신 가중치", ST.fmt(a[p], 4)],
-        ["평균 거리 Σ a·d", `${ST.fmt(md, 4)} 패치 <span class="muted">(유클리드)</span>`],
+        ["Entropy H", `${ST.fmt(H, 4)} nat <span class="muted">(uniform: ln 720 = ${ST.fmt(Math.log(720), 4)})</span>`],
+        ["Effective number of keys e^H", ST.fmt(Math.exp(H), 4)],
+        ["Self weight", ST.fmt(a[p], 4)],
+        ["Mean distance Σ a·d", `${ST.fmt(md, 4)} patches <span class="muted">(Euclidean)</span>`],
       ], "tight"));
-      right.appendChild(U.table(["키 패치", "(행, 열)", "가중치", "거리"], top.map((j) => [String(j), `(${D.patchRC(j).join(", ")})`, `<span class="mono">${ST.fmt(a[j], 5)}</span>`, ST.fmt(dist(p, j), 3)]),
-        { cls: "small", onRow: (i) => Insp.value(t, top[i], { links: [["이 키를 쿼리로", () => ctx.setSel("patch", top[i])]] }) }));
+      right.appendChild(U.table(["Key patch", "(row, col)", "Weight", "Distance"], top.map((j) => [String(j), `(${D.patchRC(j).join(", ")})`, `<span class="mono">${ST.fmt(a[j], 5)}</span>`, ST.fmt(dist(p, j), 3)]),
+        { cls: "small", onRow: (i) => Insp.value(t, top[i], { links: [["Use this key as query", () => ctx.setSel("patch", top[i])]] }) }));
       const badges = h("div", { class: "st-badges" });
       right.appendChild(badges);
       const [q, kk] = await Promise.all([ctx.read(B, "q"), ctx.read(B, "k")]);
@@ -274,17 +274,17 @@
         ref = new Float64Array(720);
         for (let x = 0; x < 16; x++) { const rr = SV.attnRow(q.data, kk.data, x, p); for (let j = 0; j < 720; j++) ref[j] += rr[j] / 16; }
       }
-      badges.appendChild(SG.cmpBadge(SG.cmp(SV.f16Tensor("softmax(q·kᵀ/√72)", [1, 720], ref), t), "q, k로 재계산", { approx: true,
-        formula: "softmax( q·kᵀ / √72 ) — float64로 계산 후 f16", open: (j) => Insp.value(t, j),
-        note: "저장된 어텐션은 캡처한 q, k로 fp32에서 다시 계산해 f16으로 저장한 값입니다 (실제 커널 SDPA는 확률을 내놓지 않음). 브라우저는 float64로 계산하므로 f16 반올림 경계에서 1 ulp가 다를 수 있습니다." }));
+      badges.appendChild(SG.cmpBadge(SG.cmp(SV.f16Tensor("softmax(q·kᵀ/√72)", [1, 720], ref), t), "Recompute from q, k", { approx: true,
+        formula: "softmax( q·kᵀ / √72 ) — computed in float64, then f16", open: (j) => Insp.value(t, j),
+        note: "The stored attention was recomputed in fp32 from the captured q, k and saved as f16 (the actual SDPA kernel does not output probabilities). The browser computes in float64, so values on an f16 rounding boundary can differ by 1 ulp." }));
       if (hh >= 0) {
         const qd = await ctx.read(D.F.vstats, "qdist", { index: [b, hh], rows: [p, p + 1] });
-        right.appendChild(U.kv([["저장된 평균 거리 (vision_stats.qdist)", `<span class="mono">${ST.fmt(qd.data[0], 5)}</span>`]], "tight"));
+        right.appendChild(U.kv([["Stored mean distance (vision_stats.qdist)", `<span class="mono">${ST.fmt(qd.data[0], 5)}</span>`]], "tight"));
       }
     });
 
-    SG.lazy(cards, ctx, `어텐션 행렬 720 × 720 — 블록 ${b} · ${hname}`, { wide: true, tools: headSeg(),
-      sub: "행 = 쿼리, 열 = 키, 둘 다 패치 순서(2×2 병합 블록 순서: 연속한 4개가 한 블록, 72개가 병합 격자의 한 줄). 빨간 줄 = 선택한 쿼리. 칸을 누르면 그 값이 열립니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Attention matrix 720 × 720 — block ${b} · ${hname}`, { wide: true, tools: headSeg(),
+      sub: "Rows = queries, columns = keys, both in patch order (2×2 merge-block order: 4 consecutive patches form one block, 72 form one row of the merge grid). Red line = selected query. Click a cell to open its value." }, async (body) => {
       const t = hh < 0 ? await ctx.read(D.F.vattn, "attn_mean", { index: [b] }) : await ctx.read(B, "attn", { index: [hh] });
       const tools = h("div", { class: "row-tools" }), box = h("div");
       body.append(tools, box);
@@ -293,70 +293,70 @@
         const cv = U.canvas();
         box.appendChild(cv);
         const W = Math.min(U.width(box, 560), 680);
-        Charts.heatmap(cv, { W, H: W, rows: 720, cols: 720, data: t.data, cmap: "mag", log: UIB.mlog, vmin: UIB.mlog ? 1e-6 : 0, marks: [{ r: p }], rowName: "쿼리", colName: "키",
+        Charts.heatmap(cv, { W, H: W, rows: 720, cols: 720, data: t.data, cmap: "mag", log: UIB.mlog, vmin: UIB.mlog ? 1e-6 : 0, marks: [{ r: p }], rowName: "query", colName: "key",
           margin: { l: 4, r: 44, t: 4, b: 4 },
-          onHover: (e) => `쿼리 ${e.r} → 키 ${e.c}<br><b>${ST.fmt(e.v, 5)}</b>`,
-          onPick: (e) => Insp.value(t, e.r * 720 + e.c, { links: [["이 쿼리로", () => ctx.setSel("patch", e.r)]] }) });
+          onHover: (e) => `Query ${e.r} → key ${e.c}<br><b>${ST.fmt(e.v, 5)}</b>`,
+          onPick: (e) => Insp.value(t, e.r * 720 + e.c, { links: [["Go to this query", () => ctx.setSel("patch", e.r)]] }) });
       };
-      tools.appendChild(U.seg([[true, "로그 색"], [false, "선형 색"]], UIB.mlog, (v) => { UIB.mlog = v; draw(); }));
+      tools.appendChild(U.seg([[true, "Log scale"], [false, "Linear scale"]], UIB.mlog, (v) => { UIB.mlog = v; draw(); }));
       draw();
     });
 
-    SG.lazy(cards, ctx, `헤드별 통계 — 블록 ${b} · 이미지 ${ctx.sel.img}`, {
-      sub: "헤드마다 쿼리 720개에 대한 평균. 막대를 누르면 그 헤드를 고릅니다. 엔트로피가 낮을수록 좁게 보고, 평균 거리가 작을수록 가까운 패치를 봅니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Per-head statistics — block ${b} · image ${ctx.sel.img}`, {
+      sub: "Mean over the 720 queries for each head. Click a bar to select that head. Lower entropy means narrower attention, and a smaller mean distance means it looks at nearer patches." }, async (body) => {
       const k = ctx.sel.img;
       const [ent, ad] = await Promise.all([ctx.read(B, "attn_ent", { rows: [k, k + 1] }), ctx.read(B, "attn_dist", { rows: [k, k + 1] })]);
       const W = U.width(body, 420), labels = Array.from({ length: 16 }, (_, x) => x);
-      for (const [t, yl] of [[ent, "엔트로피 (nats)"], [ad, "평균 거리 (패치)"]]) {
+      for (const [t, yl] of [[ent, "Entropy (nat)"], [ad, "Mean distance (patches)"]]) {
         const cv = U.canvas();
         body.appendChild(cv);
         Charts.bars(cv, { W, H: 130, values: t.data, labels, sel: hh, ylabel: yl, ymin: 0,
-          onHover: (x) => `헤드 ${x}<br>${yl} <b>${ST.fmt(t.data[x], 4)}</b>`, onPick: (x) => ctx.setSel("vhead", x) });
+          onHover: (x) => `Head ${x}<br>${yl} <b>${ST.fmt(t.data[x], 4)}</b>`, onPick: (x) => ctx.setSel("vhead", x) });
       }
-      body.appendChild(U.note(`이미지 ${k}의 값입니다 (attn_ent, attn_dist는 24장 모두 캡처). 균등 분포의 엔트로피는 ln 720 = ${ST.fmt(Math.log(720), 4)}.`, "small"));
-      body.appendChild(h("div", { class: "links" }, U.button("27블록 × 16헤드 비교 (분석 도구)", () => SV.openAnalysis("attn", { block: b }), "small ghost")));
+      body.appendChild(U.note(`Values for image ${k} (attn_ent and attn_dist were captured for all 24 images). The entropy of a uniform distribution is ln 720 = ${ST.fmt(Math.log(720), 4)}.`, "small"));
+      body.appendChild(h("div", { class: "links" }, U.button("Compare 27 blocks × 16 heads (Analysis tools)", () => SV.openAnalysis("attn", { block: b }), "small ghost")));
     });
 
-    SG.lazy(cards, ctx, `패치별 지도 — 블록 ${b}`, { wide: true,
-      sub: "받은 어텐션 = 모든 쿼리가 그 패치에 준 가중치의 합 (헤드 평균, 평균 1) — 큰 칸은 ‘어텐션 싱크’. 쿼리 엔트로피·평균 거리는 그 패치를 쿼리로 했을 때 값입니다. 칸을 누르면 그 패치를 고릅니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Per-patch maps — block ${b}`, { wide: true,
+      sub: "Received attention = sum of the weights all queries give to that patch (head mean, mean 1) — large cells are ‘attention sinks’. Query entropy and mean distance are the values with that patch as the query. Click a cell to select that patch." }, async (body) => {
       const tools = h("div", { class: "row-tools" }), box = h("div");
       body.append(tools, box);
       const draw = async () => {
         const mode = UIB.amap, k = mode === "recv" ? ctx.sel.img : FK;
         let vals, lab, log = false;
-        if (mode === "recv") { vals = (await ctx.read(B, "attn_recv", { rows: [k, k + 1] })).data; lab = "받은 어텐션 (헤드 평균)"; log = true; }
-        else if (mode === "ent") { const t = await ctx.read(B, "attn_ent_q"); vals = hh < 0 ? headAvg(t) : t.data.subarray(hh * 720, hh * 720 + 720); lab = `쿼리 엔트로피 (${hname})`; }
-        else { const t = await ctx.read(D.F.vstats, "qdist", { index: [b] }); vals = hh < 0 ? headAvg(t) : t.data.subarray(hh * 720, hh * 720 + 720); lab = `평균 거리 (${hname})`; }
+        if (mode === "recv") { vals = (await ctx.read(B, "attn_recv", { rows: [k, k + 1] })).data; lab = "Received attention (head mean)"; log = true; }
+        else if (mode === "ent") { const t = await ctx.read(B, "attn_ent_q"); vals = hh < 0 ? headAvg(t) : t.data.subarray(hh * 720, hh * 720 + 720); lab = `Query entropy (${hname})`; }
+        else { const t = await ctx.read(D.F.vstats, "qdist", { index: [b] }); vals = hh < 0 ? headAvg(t) : t.data.subarray(hh * 720, hh * 720 + 720); lab = `Mean distance (${hname})`; }
         box.innerHTML = "";
         SG.gridImg(box, k, { vals, log, alpha: 0.75, maxW: 760, sel: [SG.patchSel(p, SV.selColor())], cbLabel: lab,
-          caption: mode === "recv" ? `이미지 ${k}` : `초점 이미지 ${FK} (쿼리별 값은 초점 이미지만 캡처)`,
+          caption: mode === "recv" ? `Image ${k}` : `Focal image ${FK} (per-query values were captured for the focal image only)`,
           onPick: (j) => ctx.setSel("patch", j) });
       };
-      tools.append(U.seg([["recv", "받은 어텐션"], ["ent", "쿼리 엔트로피"], ["qdist", "평균 거리"]], UIB.amap, (v) => { UIB.amap = v; SV.guard(ctx, box, draw()); }),
-        h("span", { class: "small muted" }, "헤드"), headSeg());
+      tools.append(U.seg([["recv", "Received attention"], ["ent", "Query entropy"], ["qdist", "Mean distance"]], UIB.amap, (v) => { UIB.amap = v; SV.guard(ctx, box, draw()); }),
+        h("span", { class: "small muted" }, "Head"), headSeg());
       await draw();
     });
   }
 
   // ================================================================ 2 · proj + residual
   function sub2(cards, ctx, b, p) {
-    SG.lazy(cards, ctx, `출력 투영과 첫 잔차 — 패치 ${p}`, { wide: true }, async (body) => {
+    SG.lazy(cards, ctx, `Output projection and first residual — patch ${p}`, { wide: true }, async (body) => {
       const t = await readRow(ctx, b, p, ["ctx", "proj", "x", "mid"]);
-      SG.flowRow(body, { t: t.ctx, name: "ctx", sel: [p, 0, 0], shape: "BF16 · 16 헤드 × 72 (이어 붙임)", vlines: headLines(), colName: headName });
-      SG.arrow(body, "proj = Linear(1152 → 1152, bias) — 헤드들을 섞음");
+      SG.flowRow(body, { t: t.ctx, name: "ctx", sel: [p, 0, 0], shape: "BF16 · 16 heads × 72 (concatenated)", vlines: headLines(), colName: headName });
+      SG.arrow(body, "proj = Linear(1152 → 1152, bias) — mixes the heads");
       SG.flowRow(body, { t: t.proj, name: "proj", sel: [p, 0], shape: "BF16 · 1152" });
       SG.arrow(body, `+ x (${SV.xInName(b)})`);
       SG.flowRow(body, { t: t.x, name: `x = ${SV.xInName(b)}`, sel: [SV.FROW() + p, 0], shape: "BF16 · 1152" });
-      SG.arrow(body, "= mid (bf16 덧셈)");
+      SG.arrow(body, "= mid (bf16 addition)");
       SG.flowRow(body, { t: t.mid, name: "mid", sel: [p, 0], shape: "BF16 · 1152",
-        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("x + proj", [1, 1152], SV.addWords(t.x.data, t.proj.data)), t.mid), "잔차 재계산",
+        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("x + proj", [1, 1152], SV.addWords(t.x.data, t.proj.data)), t.mid), "Residual recompute",
           { formula: "bf16( fp32(x) + fp32(proj) )", open: (i) => Insp.value(t.mid, i) }) });
       body.appendChild(U.kv([["‖proj‖ / ‖x‖", ST.fmt(R.norm(t.proj.data) / R.norm(t.x.data), 4)], ["cos(x, proj)", ST.fmt(R.cos(t.x.data, t.proj.data), 5)],
         ["cos(x, mid)", ST.fmt(R.cos(t.x.data, t.mid.data), 6)]], "tight"));
-      body.appendChild(U.note("proj 가중치를 캡처하지 않아 ctx → proj 곱셈은 다시 계산하지 않습니다. 덧셈은 bf16 한 번 반올림이라 비트 단위로 재현됩니다.", "small"));
+      body.appendChild(U.note("The proj weights were not captured, so the ctx → proj product is not recomputed. The addition is a single bf16 rounding, so it is reproduced bit for bit.", "small"));
     });
 
-    SG.lazy(cards, ctx, `어텐션 갱신의 크기 — 초점 이미지 720패치`, { wide: true, sub: "칸을 누르면 그 패치를 고릅니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Size of the attention update — 720 patches of the focal image`, { wide: true, sub: "Click a cell to select that patch." }, async (body) => {
       const rows = [SV.FROW(), SV.FROW() + 720];
       const [x, pr, mid] = await Promise.all([SV.xIn(ctx, b, rows), ctx.read(D.F.vblock(b), "proj"), ctx.read(D.F.vblock(b), "mid")]);
       const ratio = new Float32Array(720), cx = new Float32Array(720), cp = new Float32Array(720);
@@ -377,35 +377,35 @@
       tools.appendChild(U.seg([["ratio", "‖proj‖/‖x‖"], ["cos", "cos(x, mid)"], ["cosp", "cos(x, proj)"]], UIB.umap, (v) => { UIB.umap = v; draw(); }));
       draw();
       const s = ST.stats(ratio);
-      body.appendChild(U.kv([["‖proj‖/‖x‖ 중앙값 · 최대", `${ST.fmt(R.median(ratio), 4)} · ${ST.fmt(s.max, 4)} (패치 ${s.argabsmax})`]], "tight"));
+      body.appendChild(U.kv([["‖proj‖/‖x‖ median · max", `${ST.fmt(R.median(ratio), 4)} · ${ST.fmt(s.max, 4)} (patch ${s.argabsmax})`]], "tight"));
     });
   }
 
   // ================================================================ 3 · MLP
   function sub3(cards, ctx, b, p) {
-    SG.lazy(cards, ctx, `MLP — 패치 ${p}`, { wide: true }, async (body) => {
+    SG.lazy(cards, ctx, `MLP — patch ${p}`, { wide: true }, async (body) => {
       const t = await readRow(ctx, b, p, ["mid", "norm2", "fc1", "act", "fc2"]);
       SG.flowRow(body, { t: t.mid, name: "mid", sel: [p, 0], shape: "BF16 · 1152" });
       SG.arrow(body, "LayerNorm₂ (fp32)");
       SG.flowRow(body, { t: t.norm2, name: "norm2", sel: [p, 0], shape: "F32 · 1152" });
-      SG.arrow(body, "fc1 = Linear(1152 → 4304) — 뉴런 4304개");
+      SG.arrow(body, "fc1 = Linear(1152 → 4304) — 4304 neurons");
       SG.flowRow(body, { t: t.fc1, name: "fc1", sel: [p, 0], shape: "BF16 · 4304" });
       SG.arrow(body, "GELU_tanh(x) = x/2 · (1 + tanh(√(2/π)·(x + 0.044715 x³)))");
       SG.flowRow(body, { t: t.act, name: "act", sel: [p, 0], shape: "BF16 · 4304",
-        badge: SG.cmpBadge(SG.cmp(geluRow(t.fc1), t.act), "GELU 재계산", { formula: "bf16( gelu_tanh(fc1) ), fp32 계산 (CUDA 커널 순서)", open: (i) => Insp.value(t.act, i) }) });
+        badge: SG.cmpBadge(SG.cmp(geluRow(t.fc1), t.act), "GELU recompute", { formula: "bf16( gelu_tanh(fc1) ), computed in fp32 (CUDA kernel order)", open: (i) => Insp.value(t.act, i) }) });
       SG.arrow(body, "fc2 = Linear(4304 → 1152)");
       SG.flowRow(body, { t: t.fc2, name: "fc2", sel: [p, 0], shape: "BF16 · 1152" });
       let neg = 0, small = 0;
       for (let i = 0; i < 4304; i++) { if (t.fc1.data[i] < 0) neg++; if (Math.abs(t.act.data[i]) < 0.01) small++; }
-      body.appendChild(U.kv([["fc1 < 0인 뉴런", `${neg} / 4304 (${U.pct(neg / 4304)})`], ["|act| < 0.01인 뉴런", `${small} / 4304 (${U.pct(small / 4304)})`],
+      body.appendChild(U.kv([["Neurons with fc1 < 0", `${neg} / 4304 (${U.pct(neg / 4304)})`], ["Neurons with |act| < 0.01", `${small} / 4304 (${U.pct(small / 4304)})`],
         ["‖fc2‖ / ‖mid‖", ST.fmt(R.norm(t.fc2.data) / R.norm(t.mid.data), 4)]], "tight"));
       const [left, right] = split2(body);
-      left.appendChild(h("div", { class: "small muted" }, "fc1 → act (이 패치의 뉴런 4304개) · 점을 누르면 그 뉴런 값이 열립니다"));
+      left.appendChild(h("div", { class: "small muted" }, "fc1 → act (the 4304 neurons of this patch) · click a point to open the value of that neuron"));
       const cv = U.canvas();
       left.appendChild(cv);
       Charts.scatter(cv, { W: Math.min(U.width(left, 360), 420), H: 240, x: t.fc1.data, y: t.act.data, r: 1.6, alpha: 0.6, xlabel: "fc1", ylabel: "act",
-        onHover: (i) => `뉴런 ${i}<br>fc1 ${ST.fmt(t.fc1.data[i], 5)} → act <b>${ST.fmt(t.act.data[i], 5)}</b>`, onPick: (i) => Insp.value(t.act, i) });
-      right.appendChild(h("div", { class: "small muted" }, "|act|가 큰 뉴런 12개 — 누르면 그 뉴런이 720패치에서 어떻게 켜지는지 아래 지도에 그립니다"));
+        onHover: (i) => `Neuron ${i}<br>fc1 ${ST.fmt(t.fc1.data[i], 5)} → act <b>${ST.fmt(t.act.data[i], 5)}</b>`, onPick: (i) => Insp.value(t.act, i) });
+      right.appendChild(h("div", { class: "small muted" }, "Top 12 neurons by |act| — click one to map below how that neuron fires across the 720 patches"));
       const chips = h("div", { class: "chips" });
       right.appendChild(chips);
       const top = ST.topk(t.act.data, 12);
@@ -416,9 +416,9 @@
         const a = await ctx.read(D.F.vblock(b), "act"), n = UIB.neuron, vals = new Float32Array(720);
         for (let q = 0; q < 720; q++) vals[q] = a.data[q * 4304 + n];
         mapBox.innerHTML = "";
-        mapBox.appendChild(h("div", { class: "small muted" }, `뉴런 ${n}의 act — 초점 이미지 720패치 (칸을 누르면 그 값)`));
+        mapBox.appendChild(h("div", { class: "small muted" }, `act of neuron ${n} — 720 patches of the focal image (click a cell for its value)`));
         SG.gridImg(mapBox, SV.FK(), { vals, sym: true, alpha: 0.75, maxW: 760, sel: [SG.patchSel(p, SV.selColor())], cbLabel: `act[:, ${n}]`,
-          onPick: (j) => Insp.value(a, j * 4304 + n, { links: [["이 패치 고르기", () => ctx.setSel("patch", j)]] }) });
+          onPick: (j) => Insp.value(a, j * 4304 + n, { links: [["Select this patch", () => ctx.setSel("patch", j)]] }) });
       };
       for (const i of top) {
         const bt = h("button", { class: "chip" + (i === UIB.neuron ? " on" : ""), type: "button" }, h("span", { class: "chip-i" }, `#${i}`), h("span", { class: "chip-v" }, ST.fmt(t.act.data[i], 4)));
@@ -428,14 +428,14 @@
       await drawMap();
     });
 
-    SG.lazy(cards, ctx, `LayerNorm₂ γ, β 추정 <span class="muted">(720패치 회귀 · 추정)</span>`, {}, async (body) => {
-      const btn = U.button("추정 실행", async () => {
-        btn.disabled = true; btn.textContent = "계산 중…";
+    SG.lazy(cards, ctx, `LayerNorm₂ γ, β estimates <span class="muted">(regression over 720 patches · estimate)</span>`, {}, async (body) => {
+      const btn = U.button("Compute estimate", async () => {
+        btn.disabled = true; btn.textContent = "Computing…";
         try {
           const [x, y] = await Promise.all([ctx.read(D.F.vblock(b), "mid"), ctx.read(D.F.vblock(b), "norm2")]);
           btn.remove();
-          SV.lnView(body, SV.lnEstimate(x.data, y.data, 720, 1152), { name: `블록 ${b} LN₂` });
-        } catch (e) { if (e !== SG.STALE) { btn.disabled = false; btn.textContent = "다시 시도"; body.appendChild(U.err(e)); } }
+          SV.lnView(body, SV.lnEstimate(x.data, y.data, 720, 1152), { name: `Block ${b} LN₂` });
+        } catch (e) { if (e !== SG.STALE) { btn.disabled = false; btn.textContent = "Retry"; body.appendChild(U.err(e)); } }
       }, "small");
       body.appendChild(btn);
     });
@@ -444,67 +444,67 @@
   // ================================================================ 4 · output
   function sub4(cards, ctx, b, p) {
     const s = b + 2, k = ctx.sel.img, gi = k * 720 + p;
-    SG.lazy(cards, ctx, `블록 ${b} 출력 — 이미지 ${k} · 패치 ${p}`, { wide: true }, async (body) => {
+    SG.lazy(cards, ctx, `Block ${b} output — image ${k} · patch ${p}`, { wide: true }, async (body) => {
       const tt = await readRow(ctx, b, p, ["mid", "fc2", "out"]);
       const own = await ctx.read(D.F.vblock(b), "out", { rows: [gi, gi + 1] });
-      SG.flowRow(body, { t: tt.out, name: `out (초점 이미지 ${SV.FK()})`, sel: [SV.FROW() + p, 0], shape: "BF16 · 1152",
-        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("mid + fc2", [1, 1152], SV.addWords(tt.mid.data, tt.fc2.data)), tt.out), "mid + fc2 재계산", { open: (i) => Insp.value(tt.out, i) }) });
-      if (k !== SV.FK()) SG.flowRow(body, { t: own, name: `out (이미지 ${k})`, sel: [gi, 0], shape: "BF16 · 1152" });
+      SG.flowRow(body, { t: tt.out, name: `out (focal image ${SV.FK()})`, sel: [SV.FROW() + p, 0], shape: "BF16 · 1152",
+        badge: SG.cmpBadge(SG.cmp(SG.bfTensor("mid + fc2", [1, 1152], SV.addWords(tt.mid.data, tt.fc2.data)), tt.out), "mid + fc2 recompute", { open: (i) => Insp.value(tt.out, i) }) });
+      if (k !== SV.FK()) SG.flowRow(body, { t: own, name: `out (image ${k})`, sel: [gi, 0], shape: "BF16 · 1152" });
       const st = await Promise.all(["tok_norm", "tok_upd", "tok_cos_prev", "tok_kurt", "tok_absmax"].map((key) => ctx.read(D.F.vstats, key, { index: [s], rows: [gi, gi + 1] })));
-      body.appendChild(U.kv([["‖out‖", ST.fmt(st[0].data[0], 5)], ["갱신 비율 ‖Δ‖/‖x_prev‖", ST.fmt(st[1].data[0], 4)], ["cos(out, x)", ST.fmt(st[2].data[0], 5)],
-        ["첨도 (가우시안 = 3)", ST.fmt(st[3].data[0], 4)], ["max|out|", ST.fmt(st[4].data[0], 5)]], "tight"));
+      body.appendChild(U.kv([["‖out‖", ST.fmt(st[0].data[0], 5)], ["Update ratio ‖Δ‖/‖x_prev‖", ST.fmt(st[1].data[0], 4)], ["cos(out, x)", ST.fmt(st[2].data[0], 5)],
+        ["Kurtosis (Gaussian = 3)", ST.fmt(st[3].data[0], 4)], ["max|out|", ST.fmt(st[4].data[0], 5)]], "tight"));
       const links = h("div", { class: "links" });
       const di = SV.DS_IDX().indexOf(b);
-      if (di >= 0) links.appendChild(U.button(`이 출력 → 딥스택 ${di} (LLM 레이어 ${di}에 더해짐) ▶`, () => { ctx.setSel("ds", di, false); ctx.go("deepstack"); }, ""));
-      links.appendChild(b < NB - 1 ? U.button(`다음: 블록 ${b + 1} ▶`, () => ctx.go("vblock", b + 1, ctx.detail ? 0 : -1), "ghost") : U.button("다음: 패치 병합기 ▶", () => ctx.go("merger"), "ghost"));
-      links.appendChild(U.button("분포 분석", () => SV.openAnalysis("dist", { domain: "vis", stage: s }), "ghost"));
+      if (di >= 0) links.appendChild(U.button(`This output → DeepStack ${di} (added to LLM layer ${di}) ▶`, () => { ctx.setSel("ds", di, false); ctx.go("deepstack"); }, ""));
+      links.appendChild(b < NB - 1 ? U.button(`Next: block ${b + 1} ▶`, () => ctx.go("vblock", b + 1, ctx.detail ? 0 : -1), "ghost") : U.button("Next: patch merger ▶", () => ctx.go("merger"), "ghost"));
+      links.appendChild(U.button("Distribution analysis", () => SV.openAnalysis("dist", { domain: "vis", stage: s }), "ghost"));
       body.appendChild(links);
     });
 
-    SG.lazy(cards, ctx, `24장 전체 — 블록 ${b} 출력 통계`, { wide: true,
-      sub: "모든 이미지가 같은 블록을 거칩니다. 칸을 누르면 그 이미지·패치를 고릅니다. 색 범위는 24장 공통 (0.1–99.9 백분위)." }, async (body) => {
+    SG.lazy(cards, ctx, `All 24 images — block ${b} output stats`, { wide: true,
+      sub: "Every image goes through the same block. Click a cell to select that image and patch. The color range is shared by all 24 images (0.1–99.9 percentile)." }, async (body) => {
       const tools = h("div", { class: "row-tools" }), box = h("div");
       body.append(tools, box);
       tools.appendChild(SV.metricSeg(ctx, box, s));
       await SV.stageMini(box, ctx, s);
     });
 
-    SG.lazy(cards, ctx, `PCA 색 — 블록 ${b} 출력`, { wide: true,
-      sub: "토큰마다 표준화한 1152차원 벡터의 주성분 3개를 RGB로 (표시용, 부호는 단계마다 맞춤). 비슷한 색 = 비슷한 표현. 왼쪽은 24장 공통 적합, 오른쪽은 초점 이미지만으로 적합." }, async (body) => {
+    SG.lazy(cards, ctx, `PCA color — block ${b} output`, { wide: true,
+      sub: "3 principal components of the per-token standardized 1152-dim vectors as RGB (for display only; signs aligned stage by stage). Similar color = similar representation. Left: fit shared by all 24 images; right: fit on the focal image alone." }, async (body) => {
       const [pa, pf, ea, ef] = await Promise.all([ctx.read(D.F.vstats, "pca_rgb", { index: [s], rows: [k * 720, k * 720 + 720] }), ctx.read(D.F.vstats, "pcaf_rgb", { index: [s] }),
         ctx.read(D.F.vstats, "pca_evr", { index: [s] }), ctx.read(D.F.vstats, "pcaf_evr", { index: [s] })]);
       const [left, right] = split2(body);
-      const evr = (e) => `설명 분산 PC1 ${U.pct(e.data[0])} · PC2 ${U.pct(e.data[1])} · PC3 ${U.pct(e.data[2])}`;
-      SG.gridImg(left, k, { rgb: pa.data, alpha: 0.85, maxW: 480, sel: [SG.patchSel(p, SV.selColor())], caption: `이미지 ${k} · 24장 공통 적합 · ${evr(ea)}`, onPick: (j) => ctx.setSel("patch", j) });
-      SG.gridImg(right, SV.FK(), { rgb: pf.data, alpha: 0.85, maxW: 480, sel: [SG.patchSel(p, SV.selColor())], caption: `초점 이미지 ${SV.FK()} 단독 적합 · ${evr(ef)}`, onPick: (j) => ctx.setSel("patch", j) });
+      const evr = (e) => `Explained variance PC1 ${U.pct(e.data[0])} · PC2 ${U.pct(e.data[1])} · PC3 ${U.pct(e.data[2])}`;
+      SG.gridImg(left, k, { rgb: pa.data, alpha: 0.85, maxW: 480, sel: [SG.patchSel(p, SV.selColor())], caption: `Image ${k} · fit shared by 24 images · ${evr(ea)}`, onPick: (j) => ctx.setSel("patch", j) });
+      SG.gridImg(right, SV.FK(), { rgb: pf.data, alpha: 0.85, maxW: 480, sel: [SG.patchSel(p, SV.selColor())], caption: `Focal image ${SV.FK()} · fit on this image alone · ${evr(ef)}`, onPick: (j) => ctx.setSel("patch", j) });
     });
 
-    SG.lazy(cards, ctx, `대규모 활성 — 블록 ${b} 출력의 |값| 상위 16개`, {
-      sub: "24장 17,280패치 × 1152채널 중 가장 큰 값들. 같은 채널이 반복되면 ‘고정 채널 이상치’ (양자화의 범위를 좌우). 행을 누르면 그 값이 열립니다." }, async (body) => {
+    SG.lazy(cards, ctx, `Massive activations — top 16 |values| of the block ${b} output`, {
+      sub: "The largest values among the 17,280 patches of the 24 images × 1152 channels. When the same channel repeats, it is a ‘fixed-channel outlier’ (it dominates the quantization range). Click a row to open its value." }, async (body) => {
       const [mt, mc, mv] = await Promise.all(["massive_tok", "massive_ch", "massive_val"].map((key) => ctx.read(D.F.vstats, key, { index: [s] })));
       const rows = [];
       for (let i = 0; i < 16; i++) { const row = mt.data[i]; rows.push([String(i + 1), String(Math.floor(row / 720)), String(row % 720), String(mc.data[i]), `<span class="mono">${ST.fmt(mv.data[i], 5)}</span>`]); }
-      body.appendChild(U.table(["순위", "이미지", "패치", "채널", "값"], rows, { cls: "small", onRow: async (i) => {
+      body.appendChild(U.table(["Rank", "Image", "Patch", "Channel", "Value"], rows, { cls: "small", onRow: async (i) => {
         const row = mt.data[i], t = await ST.read(D.F.vblock(b), "out", { rows: [row, row + 1] });
-        Insp.value(t, mc.data[i], { links: [["이 이미지·패치 고르기", () => { ctx.setSel("img", Math.floor(row / 720), false); ctx.setSel("patch", row % 720); }]] });
+        Insp.value(t, mc.data[i], { links: [["Select this image and patch", () => { ctx.setSel("img", Math.floor(row / 720), false); ctx.setSel("patch", row % 720); }]] });
       } }));
       const chans = new Map();
       for (let i = 0; i < 16; i++) chans.set(mc.data[i], (chans.get(mc.data[i]) || 0) + 1);
-      body.appendChild(U.kv([["서로 다른 채널", `${chans.size}개: ${[...chans].sort((a, bb) => bb[1] - a[1]).map(([ch, n]) => `${ch}×${n}`).join(", ")}`]], "tight"));
-      body.appendChild(h("div", { class: "links" }, U.button("단계별 대규모 활성 (분석 도구)", () => SV.openAnalysis("massive", { domain: "vis", stage: s }), "small ghost")));
+      body.appendChild(U.kv([["Distinct channels", `${chans.size}: ${[...chans].sort((a, bb) => bb[1] - a[1]).map(([ch, n]) => `${ch}×${n}`).join(", ")}`]], "tight"));
+      body.appendChild(h("div", { class: "links" }, U.button("Massive activations by stage (Analysis tools)", () => SV.openAnalysis("massive", { domain: "vis", stage: s }), "small ghost")));
     });
 
-    SG.lazy(cards, ctx, `양자화 민감도 — 블록 ${b}의 선형층 4개`, { wide: true }, async (body) => {
+    SG.lazy(cards, ctx, `Quantization sensitivity — the 4 linear layers of block ${b}`, { wide: true }, async (body) => {
       await SV.sqnrTable(body, ctx, { prefix: "vis", index: [b], names: D.LIN_V });
-      body.appendChild(h("div", { class: "links" }, U.button("27블록 SQNR 비교 (분석 도구)", () => SV.openAnalysis("sqnr", { domain: "vis", layer: b }), "small ghost")));
+      body.appendChild(h("div", { class: "links" }, U.button("Compare SQNR across 27 blocks (Analysis tools)", () => SV.openAnalysis("sqnr", { domain: "vis", layer: b }), "small ghost")));
     });
   }
 
   // ================================================================ shared: SQNR table
   const VAR_DESC = {
-    A8_tensor: "활성만 INT8 · 텐서당 스케일 1개 (max|X| / 127)", A8_token: "활성만 INT8 · 토큰별 스케일",
-    W8_channel: "가중치만 INT8 · 출력 채널별 스케일", W4_channel: "가중치만 INT4 (±7) · 출력 채널별", W4_g128: "가중치만 INT4 · 입력 128개 그룹별",
-    W8A8_tensor: "W8 (채널별) + A8 (텐서당)", W8A8_token: "W8 (채널별) + A8 (토큰별)", SQ_W8A8_tensor: "SmoothQuant 뒤 W8 (채널별) + A8 (텐서당)",
+    A8_tensor: "INT8 activations only · one scale per tensor (max|X| / 127)", A8_token: "INT8 activations only · per-token scale",
+    W8_channel: "INT8 weights only · per-output-channel scale", W4_channel: "INT4 weights only (±7) · per output channel", W4_g128: "INT4 weights only · per group of 128 inputs",
+    W8A8_tensor: "W8 (per channel) + A8 (per tensor)", W8A8_token: "W8 (per channel) + A8 (per token)", SQ_W8A8_tensor: "W8 (per channel) + A8 (per tensor) after SmoothQuant",
   };
   /** Fake-quant SQNR table of one layer from quant_summary. o: {prefix: vis|vism|llm|exp|expx, index, names} */
   async function sqnrTable(parent, ctx, o) {
@@ -512,9 +512,9 @@
     const [sq, aa, ach, atk, wa, nt] = await Promise.all(keys.map((kk) => ctx.read(D.F.qsum, `${o.prefix}_${kk}`, { index: o.index || [] })));
     const V = D.M.sqnr_variants, nv = V.length;
     const tb = h("table", { class: "tbl num-tbl small sqnr" });
-    tb.appendChild(h("thead", {}, h("tr", {}, h("th", {}, "선형층"), V.map((v) => h("th", { title: VAR_DESC[v] || v }, v.replace(/_/g, " "))),
-      h("th", { title: "활성 max|X| (모든 토큰)" }, "max|X|"), h("th", { title: "입력 채널별 max|X|의 max / 중앙값" }, "채널 이상치"),
-      h("th", { title: "토큰별 max|X|의 max / 중앙값" }, "토큰 이상치"), h("th", { title: "가중치 max|W|" }, "max|W|"))));
+    tb.appendChild(h("thead", {}, h("tr", {}, h("th", {}, "Linear layer"), V.map((v) => h("th", { title: VAR_DESC[v] || v }, v.replace(/_/g, " "))),
+      h("th", { title: "Activation max|X| (all tokens)" }, "max|X|"), h("th", { title: "Max / median of the per-input-channel max|X|" }, "Channel outlier"),
+      h("th", { title: "Max / median of the per-token max|X|" }, "Token outlier"), h("th", { title: "Weight max|W|" }, "max|W|"))));
     const body = h("tbody");
     o.names.forEach((name, li) => {
       const tr = h("tr", {}, h("th", {}, name));
@@ -529,12 +529,12 @@
     });
     tb.appendChild(body);
     parent.appendChild(h("div", { class: "tbl-wrap" }, tb));
-    parent.appendChild(U.note(`SQNR = 10·log₁₀(‖Y‖² / ‖Y − Ŷ‖²) dB, Y = X·Wᵀ (bias 제외), 균등 간격 토큰 ${ST.fmt(Math.min(D.M.n_eval_tokens, nt.data[0]))}개로 대칭 가짜 양자화 ` +
-      `(INT8 ±127, INT4 ±7). max|X|와 이상치 비는 토큰 ${ST.fmt(nt.data[0])}개 전체. SmoothQuant α = ${D.M.sq_alpha}. ` +
-      "색(≥ 30 dB 초록 · 20–30 노랑 · < 20 빨강)은 읽기 편하게 나눈 표시일 뿐 정확도 판정이 아니며, 이 샘플 하나의 활성 기준이라 층·방식 사이의 <b>상대 비교</b>로만 보세요.", "small"));
+    parent.appendChild(U.note(`SQNR = 10·log₁₀(‖Y‖² / ‖Y − Ŷ‖²) dB, Y = X·Wᵀ (without bias), symmetric fake quantization on ${ST.fmt(Math.min(D.M.n_eval_tokens, nt.data[0]))} evenly spaced tokens ` +
+      `(INT8 ±127, INT4 ±7). max|X| and the outlier ratios use all ${ST.fmt(nt.data[0])} tokens. SmoothQuant α = ${D.M.sq_alpha}. ` +
+      "The colors (≥ 30 dB green · 20–30 yellow · < 20 red) are only bands for easier reading, not an accuracy verdict. They are based on the activations of this one sample, so use them only for <b>relative comparison</b> between layers and methods.", "small"));
   }
   SV.sqnrTable = sqnrTable;
   SV.VAR_DESC = VAR_DESC;
 
-  SG.reg("vblock", { title: (i, sub) => `비전 블록 ${i}` + (sub >= 0 ? ` · ${SG.SUBS.vblock[sub]}` : ""), render });
+  SG.reg("vblock", { title: (i, sub) => `Vision block ${i}` + (sub >= 0 ? ` · ${SG.SUBS.vblock[sub]}` : ""), render });
 })();

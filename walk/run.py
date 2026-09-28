@@ -10,7 +10,7 @@ Outputs
     out/raw/inputs.safetensors  processor outputs (saved before seeding)
     out/raw/expert/flow_traj.safetensors
                                 trajectory decoded from every flow step: x_k (exact Euler
-                                states) and x1_hat_k = x_k + (1 - t_k) v_k (추정: assumes the
+                                states) and x1_hat_k = x_k + (1 - t_k) v_k (estimate: assumes the
                                 linear rectified-flow path; the repo ships no training loss)
     out/result/                 notebook cell 7 figure/json + run_result.json
 

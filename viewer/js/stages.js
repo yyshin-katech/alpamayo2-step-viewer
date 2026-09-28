@@ -15,8 +15,8 @@ const SG = (() => {
   const STALE = { stale: true };
   const pad2 = (n) => String(n).padStart(2, "0"), pad3 = (n) => String(n).padStart(3, "0");
   const LINKS = [
-    { label: "모델 카드", href: "https://huggingface.co/nvidia/Alpamayo2-Super", title: "Hugging Face 모델 카드 (새 탭)" },
-    { label: "원본 코드", href: "https://github.com/NVlabs/alpamayo2", title: "NVlabs/alpamayo2 (새 탭)" },
+    { label: "Model card", href: "https://huggingface.co/nvidia/Alpamayo2-Super", title: "Hugging Face model card (new tab)" },
+    { label: "Original code", href: "https://github.com/NVlabs/alpamayo2", title: "NVlabs/alpamayo2 (new tab)" },
   ];
 
   // ================================================================ steps
@@ -25,16 +25,16 @@ const SG = (() => {
   const SPLIT = { vblock: 5, llm: 5 };
   const SUBKEY = { vblock: "vsub", llm: "lsub" };
   const SUBS = {
-    vblock: ["LN1 → QKV → RoPE", "어텐션", "proj + 잔차", "MLP", "출력"],
-    llm: ["RMSNorm → QKV → RoPE", "어텐션 (GQA)", "o_proj + 잔차", "SwiGLU MLP", "출력 (+딥스택)"],
+    vblock: ["LN1 → QKV → RoPE", "Attention", "proj + residual", "MLP", "Output"],
+    llm: ["RMSNorm → QKV → RoPE", "Attention (GQA)", "o_proj + residual", "SwiGLU MLP", "Output (+DeepStack)"],
   };
   const GROUPS = [
-    { id: "in", name: "입력", kinds: ["scene"], color: "var(--muted)" },
-    { id: "vis", name: "비전 인코더", kinds: ["patch", "pos", "vblock", "merger", "deepstack"], color: "var(--vis)" },
-    { id: "pre", name: "LLM 프리필", kinds: ["prompt", "llm"], color: "var(--llm)" },
-    { id: "dec", name: "디코드 (CoT)", kinds: ["decode"], color: "var(--llm)" },
-    { id: "exp", name: "행동 전문가", kinds: ["esetup", "expert"], color: "var(--exp)" },
-    { id: "out", name: "결과", kinds: ["result"], color: "var(--muted)" },
+    { id: "in", name: "Input", kinds: ["scene"], color: "var(--muted)" },
+    { id: "vis", name: "Vision encoder", kinds: ["patch", "pos", "vblock", "merger", "deepstack"], color: "var(--vis)" },
+    { id: "pre", name: "LLM prefill", kinds: ["prompt", "llm"], color: "var(--llm)" },
+    { id: "dec", name: "Decode (CoT)", kinds: ["decode"], color: "var(--llm)" },
+    { id: "exp", name: "Action expert", kinds: ["esetup", "expert"], color: "var(--exp)" },
+    { id: "out", name: "Result", kinds: ["result"], color: "var(--muted)" },
   ];
 
   function reg(kind, def) { REG[kind] = def; }
@@ -102,7 +102,7 @@ const SG = (() => {
     Charts.hideTip();
     el.innerHTML = "";
     const def = REG[step.kind];
-    if (!def) { el.appendChild(U.err(new Error(`단계 ${step.kind} 없음`))); return ctx; }
+    if (!def) { el.appendChild(U.err(new Error(`Step ${step.kind} not found`))); return ctx; }
     const sub = step.sub >= 0 ? step.sub : (SUBKEY[step.kind] ? SEL[SUBKEY[step.kind]] : -1);
     try {
       const r = def.render(el, ctx, step.i, sub);
@@ -142,7 +142,7 @@ const SG = (() => {
   /** Sub-step switcher of a split stage (vision block / LLM layer). */
   function subNav(ctx, kind, i, sub) {
     const opts = [];
-    if (!ctx.detail) opts.push([-1, "전체 흐름", "이 레이어의 모든 중간값을 한 화면에"]);
+    if (!ctx.detail) opts.push([-1, "Full flow", "All intermediates of this layer in one view"]);
     SUBS[kind].forEach((s, k) => opts.push([k, `${k + 1}. ${s}`]));
     return U.seg(opts, ctx.detail ? Math.max(0, sub) : sub, (v) => {
       if (ctx.detail) ctx.go(kind, i, v);
@@ -158,7 +158,7 @@ const SG = (() => {
 
   function arrow(parent, html) { parent.appendChild(h("div", { class: "farrow", html: "↓ " + html })); }
   // BEV lateral-scale toggle; every toggle on screen (stage + drawer) follows SEL.bevx and redraws its chart
-  const BEVX = [[1, "1:1"], [5, "가로 ×5"], [20, "가로 ×20"]];
+  const BEVX = [[1, "1:1"], [5, "Horizontal ×5"], [20, "Horizontal ×20"]];
   function bevScale(ctx, redraw, cls = "small") {
     const el = U.seg(BEVX, ctx.sel.bevx, (v) => {
       ctx.setSel("bevx", v, false);
@@ -198,7 +198,7 @@ const SG = (() => {
   function flowRow(parent, o) {
     const t = o.t, off = o.off || 0, n = o.n ?? (t.data.length - off);
     const s = ST.stats(t.data.subarray(off, off + n));
-    const name = h("button", { class: "fr-name", type: "button", title: "텐서 전체를 인스펙터에서 열기" }, o.name);
+    const name = h("button", { class: "fr-name", type: "button", title: "Open the whole tensor in the inspector" }, o.name);
     name.onclick = () => {
       const url = o.url ?? t.url;
       if (url) Insp.open(url, o.key || t.key, { sel: o.sel, label: o.label });
@@ -206,8 +206,8 @@ const SG = (() => {
     };
     const row = h("div", { class: "frow" + (o.cls ? " " + o.cls : "") },
       h("div", { class: "fr-top" }, name,
-        h("span", { class: "fr-shape mono" }, o.shape || `${t.dtype} · ${n}개`),
-        h("span", { class: "fr-stats mono" }, `‖x‖ ${ST.fmt(s.norm)} · max|x| ${ST.fmt(s.absmax)} · 평균 ${ST.fmt(s.mean, 3)}`),
+        h("span", { class: "fr-shape mono" }, o.shape || `${t.dtype} · n = ${n}`),
+        h("span", { class: "fr-stats mono" }, `‖x‖ ${ST.fmt(s.norm)} · max|x| ${ST.fmt(s.absmax)} · mean ${ST.fmt(s.mean, 3)}`),
         o.badge || null));
     parent.appendChild(row);
     strip(row, t, { off, n, sym: o.sym ?? true, cmap: o.cmap, log: o.log, label: o.name, vlabel: o.vlabel, H: o.H, pick: o.pick, colName: o.colName, vlines: o.vlines });
@@ -266,7 +266,7 @@ const SG = (() => {
       lines: o.lines, blocks: o.blocks, sel: o.sel,
       onHover: (hc) => {
         const idx = idxOf(hc);
-        const head = o.onHover ? o.onHover(idx, hc) : `${merged ? "병합 토큰" : "패치"} ${idx} · (${hc.r}, ${hc.c})`;
+        const head = o.onHover ? o.onHover(idx, hc) : `${merged ? "Merged token" : "Patch"} ${idx} · (${hc.r}, ${hc.c})`;
         return head + (g ? `<br><b>${ST.fmt(g[hc.r * gw + hc.c], 5)}</b>` : "");
       },
       onPick: o.onPick ? (hc) => o.onPick(idxOf(hc), hc) : null,
@@ -334,7 +334,7 @@ const SG = (() => {
   /** Bin legend chips (images by camera colour, then the text bins). */
   function binLegend(parent) {
     const L = h("div", { class: "legend" });
-    D.cams().titles.forEach((t, s) => L.appendChild(h("span", { class: "lg" }, h("i", { style: { background: D.SLOT_COL[s] } }), `${t} (이미지 ${4 * s}–${4 * s + 3})`)));
+    D.cams().titles.forEach((t, s) => L.appendChild(h("span", { class: "lg" }, h("i", { style: { background: D.SLOT_COL[s] } }), `${t} (images ${4 * s}–${4 * s + 3})`)));
     for (const b of [24, 25, 26, 27]) L.appendChild(h("span", { class: "lg" }, h("i", { style: { background: D.binColor(b) } }), D.binName(b)));
     parent.appendChild(L);
     return L;
@@ -346,9 +346,9 @@ const SG = (() => {
     const ok = c ? c.ok : null;
     const b = h("button", { class: "badge chk " + (ok === true ? "ok" : ok === false ? "bad" : "unk"), type: "button", title: name },
       (ok === true ? "✓ " : ok === false ? "✗ " : "? ") + (label || name));
-    b.onclick = () => Insp.html(`검사 ${name}`, h("div", {},
-      U.kv(Object.entries(c || { ok: "manifest에 없음" }).map(([k, v]) => [esc(k), `<span class="mono">${esc(typeof v === "object" ? JSON.stringify(v) : String(v))}</span>`]), "tight"),
-      U.note("analyze.py가 캡처 파일을 다시 읽어 확인한 결과입니다 (manifest.checks).", "small")));
+    b.onclick = () => Insp.html(`Check ${name}`, h("div", {},
+      U.kv(Object.entries(c || { ok: "not in manifest" }).map(([k, v]) => [esc(k), `<span class="mono">${esc(typeof v === "object" ? JSON.stringify(v) : String(v))}</span>`]), "tight"),
+      U.note("analyze.py read the capture files again to check this (manifest.checks).", "small")));
     return b;
   }
 
@@ -376,22 +376,22 @@ const SG = (() => {
   function cmpBadge(res, label, o = {}) {
     const exact = res.ok;
     const pct = res.n ? (100 * res.eq) / res.n : 0;
-    const txt = exact ? `✓ ${label} · ${ST.fmt(res.n)}/${ST.fmt(res.n)} ${res.bits ? "비트 일치" : "일치"}`
-      : `${o.approx ? "≈" : "✗"} ${label} · ${pct >= 99.995 ? pct.toFixed(3) : pct.toFixed(2)}% ${res.bits ? "비트 일치" : "일치"}${res.bits && res.maxUlp ? ` (최대 ${res.maxUlp} ulp)` : ""}`;
+    const txt = exact ? `✓ ${label} · ${ST.fmt(res.n)}/${ST.fmt(res.n)} ${res.bits ? "bit-exact" : "match"}`
+      : `${o.approx ? "≈" : "✗"} ${label} · ${pct >= 99.995 ? pct.toFixed(3) : pct.toFixed(2)}% ${res.bits ? "bit-exact" : "match"}${res.bits && res.maxUlp ? ` (max ${res.maxUlp} ulp)` : ""}`;
     const b = h("button", { class: "badge chk " + (exact ? "ok" : o.approx ? "approx" : "bad"), type: "button" }, txt);
-    b.onclick = () => Insp.html(`재계산 비교: ${label}`, (() => {
+    b.onclick = () => Insp.html(`Recomputation comparison: ${label}`, (() => {
       const box = h("div", {});
       if (o.formula) box.appendChild(h("div", { class: "st-formula mono small", html: o.formula }));
       box.appendChild(U.kv([
-        ["비교한 값", ST.fmt(res.n)],
-        [res.bits ? "비트 단위 일치" : "값 일치", `${ST.fmt(res.eq)} (${pct.toFixed(4)}%)`],
-        ["최대 절대 오차", ST.fmt(res.maxAbs, 4)],
-        ["최대 상대 오차", ST.fmt(res.maxRel, 4)],
-        res.bits ? ["최대 차이 (bf16 ulp)", String(res.maxUlp)] : null,
-        ["첫 불일치 인덱스", res.first < 0 ? "없음" : String(res.first)],
+        ["Values compared", ST.fmt(res.n)],
+        [res.bits ? "Bitwise matches" : "Value matches", `${ST.fmt(res.eq)} (${pct.toFixed(4)}%)`],
+        ["Max absolute error", ST.fmt(res.maxAbs, 4)],
+        ["Max relative error", ST.fmt(res.maxRel, 4)],
+        res.bits ? ["Max difference (bf16 ulp)", String(res.maxUlp)] : null,
+        ["First mismatch index", res.first < 0 ? "none" : String(res.first)],
       ], "tight"));
       if (o.note) box.appendChild(U.note(o.note, "small"));
-      if (res.worst >= 0 && o.open) box.appendChild(h("div", { class: "links" }, U.button("가장 큰 차이 보기", () => o.open(res.worst), "")));
+      if (res.worst >= 0 && o.open) box.appendChild(h("div", { class: "links" }, U.button("Show largest difference", () => o.open(res.worst), "")));
       return box;
     })());
     return b;
@@ -478,17 +478,17 @@ const SG = (() => {
     norm(a, n = a.length, o = 0) { let s = 0; for (let i = 0; i < n; i++) s += a[o + i] * a[o + i]; return Math.sqrt(s); },
   };
 
-  // ================================================================ recompute registry (analysis → 검증)
+  // ================================================================ recompute registry (analysis → checks)
   const RECOMP = [];
   function addRecompute(r) { const k = RECOMP.findIndex((x) => x.id === r.id); if (k >= 0) RECOMP[k] = r; else RECOMP.push(r); }
 
   // ================================================================ tokens
   function tokChip(id, o = {}) {
-    const b = h("button", { class: "tok tokchip" + (o.cls ? " " + o.cls : ""), type: "button", title: o.title || `토큰 id ${id}` },
+    const b = h("button", { class: "tok tokchip" + (o.cls ? " " + o.cls : ""), type: "button", title: o.title || `Token id ${id}` },
       o.text ?? D.tokText(id));
     if (o.text === undefined) D.vocab().then(() => { b.textContent = D.tokText(id); }, () => {});
-    b.onclick = o.onClick || (() => Insp.html(`토큰 ${id}`, U.kv([["id", String(id)], ["표시", `<span class="tok">${esc(D.tokText(id))}</span>`],
-      ["원문 (byte-level BPE)", `<span class="mono">${esc(JSON.stringify(D.tokRaw(id)))}</span>`]], "tight")));
+    b.onclick = o.onClick || (() => Insp.html(`Token ${id}`, U.kv([["id", String(id)], ["Shown as", `<span class="tok">${esc(D.tokText(id))}</span>`],
+      ["Raw (byte-level BPE)", `<span class="mono">${esc(JSON.stringify(D.tokRaw(id)))}</span>`]], "tight")));
     return b;
   }
   const isSpecial = (s) => /^<\|.*\|>$/.test(s) || /^<i\d+>$/.test(s);
@@ -497,41 +497,41 @@ const SG = (() => {
   function renderScene(el, ctx) {
     const M = D.M, T = D.T, L = D.L();
     const cards = head(el, {
-      kind: "scene", kicker: "0 · 입력",
-      title: "입력 장면 — 카메라 6대 × 4프레임, 과거 궤적 1.5초",
-      desc: `클립 <span class="mono">${esc(M.sample.clip_id)}</span>, t0 = ${M.sample.t0_us / 1e6} s. 노트북 예제의 샘플 0을 그대로 실행하며 캡처한 값입니다. ` +
-        `<b>다음 ▶</b>(→ 키)을 누르면 이 입력이 비전 인코더 → LLM → 행동 전문가를 거쳐 궤적이 되는 과정을 한 단계씩 따라갑니다. ` +
-        `모든 차트·표의 값은 클릭하면 오른쪽 인스펙터에 저장된 비트와 좌표의 의미가 나옵니다.`,
-      badges: [check("tokens.prompt_matches_capture", "프롬프트 토큰 = 캡처"), check("images.temporal_pair_identical", "정지영상 × 시간축 2")],
+      kind: "scene", kicker: "0 · Input",
+      title: "Input scene — 6 cameras × 4 frames, 1.5 s of past trajectory",
+      desc: `Clip <span class="mono">${esc(M.sample.clip_id)}</span>, t0 = ${M.sample.t0_us / 1e6} s. These values were captured by running sample 0 of the notebook example as is. ` +
+        `Press <b>Next step ▶</b> (→ key) to follow, one step at a time, how this input passes through the vision encoder → LLM → action expert and becomes a trajectory. ` +
+        `Click any value in a chart or table to see its stored bits and what its coordinates mean in the inspector on the right.`,
+      badges: [check("tokens.prompt_matches_capture", "Prompt tokens = capture"), check("images.temporal_pair_identical", "Still image × 2 along time")],
     });
 
     // cameras
-    const camCard = U.card("카메라 입력 24장 <span class='muted'>(프롬프트 순서: 카메라 6대 × 프레임 4개)</span>", { wide: true,
-      sub: "모델은 이 24장을 각각 576×320으로 줄여 20×36 = 720개 패치(16×16)로 자릅니다. 썸네일을 클릭하면 모델이 받은 그대로의 입력과 프롬프트 위치가 나옵니다. " +
-        `<b>이미지 ${L.focal_image}</b>(front wide, 가장 최근 프레임)는 비전 블록 내부값을 모두 캡처한 <b>초점 이미지</b>입니다.` });
+    const camCard = U.card("24 camera inputs <span class='muted'>(prompt order: 6 cameras × 4 frames)</span>", { wide: true,
+      sub: "The model downscales each of these 24 images to 576×320 and cuts it into 20×36 = 720 patches (16×16). Click a thumbnail to see the input exactly as the model received it and its prompt positions. " +
+        `<b>Image ${L.focal_image}</b> (front wide, latest frame) is the <b>focal image</b>, for which every internal value of the vision blocks is captured.` });
     cards.appendChild(camCard);
     const cb = camCard.querySelector(".card-b");
     const gridEl = h("div", { class: "camgrid" });
     gridEl.appendChild(h("div", { class: "cg-h" }));
-    for (let f = 0; f < 4; f++) gridEl.appendChild(h("div", { class: "cg-h" }, `프레임 ${f}`));
+    for (let f = 0; f < 4; f++) gridEl.appendChild(h("div", { class: "cg-h" }, `Frame ${f}`));
     for (let s = 0; s < 6; s++) {
       const c0 = D.camOf(4 * s);
       gridEl.appendChild(h("div", { class: "cg-cam" }, h("b", {}, c0.title), h("span", { class: "muted small" }, `id ${c0.id}`)));
       for (let f = 0; f < 4; f++) {
         const k = 4 * s + f, c = D.camOf(k);
         const fig = h("button", { class: "cg-cell" + (k === ctx.sel.img ? " sel" : "") + (k === L.focal_image ? " focal" : ""), type: "button" },
-          h("img", { src: D.F.img(`cam${s}_f${f}.jpg`), alt: `이미지 ${k}`, loading: "lazy" }),
-          h("span", { class: "cg-cap" }, `이미지 ${k} · +${c.t.toFixed(3)} s`),
-          k === L.focal_image ? h("span", { class: "badge focal-b" }, "초점") : null);
+          h("img", { src: D.F.img(`cam${s}_f${f}.jpg`), alt: `Image ${k}`, loading: "lazy" }),
+          h("span", { class: "cg-cap" }, `Image ${k} · +${c.t.toFixed(3)} s`),
+          k === L.focal_image ? h("span", { class: "badge focal-b" }, "focal") : null);
         fig.onclick = () => { ctx.setSel("img", k, false); for (const x of gridEl.querySelectorAll(".cg-cell")) x.classList.remove("sel"); fig.classList.add("sel"); showImage(ctx, k); };
         gridEl.appendChild(fig);
       }
     }
     cb.appendChild(gridEl);
-    cb.appendChild(U.note("프레임 시각은 각 카메라 첫 프레임 기준 상대 시각(relative_timestamps)입니다. 프레임 3이 t0 시점에 가장 가까운 최신 프레임입니다.", "small"));
+    cb.appendChild(U.note("Frame times are relative to the first frame of each camera (relative_timestamps). Frame 3 is the latest frame, closest to t0.", "small"));
 
     // history
-    lazy(cards, ctx, "과거 궤적 <span class='muted'>(모델 입력 · 자차 좌표계)</span>", {}, async (body) => {
+    lazy(cards, ctx, "Past trajectory <span class='muted'>(model input · ego frame)</span>", {}, async (body) => {
       const t = await ctx.read(D.F.inputs, "ego_history_xyz");
       const cv = U.canvas();
       body.appendChild(cv);
@@ -539,25 +539,25 @@ const SG = (() => {
       Charts.bev(cv, {
         W: U.width(body, 420), H: 300, egoColor: pal.ego,
         paths: [
-          { pts: T.history_xyz, color: pal.history, width: 2.5, dots: 2.5, label: "과거 1.5 s (입력)", t: T.history_t },
-          { pts: T.gt_xyz, color: pal.ground_truth, width: 1.5, dash: [5, 4], alpha: 0.8, label: "미래 정답 (평가용, 입력 아님)", t: T.future_t },
+          { pts: T.history_xyz, color: pal.history, width: 2.5, dots: 2.5, label: "Past 1.5 s (input)", t: T.history_t },
+          { pts: T.gt_xyz, color: pal.ground_truth, width: 1.5, dash: [5, 4], alpha: 0.8, label: "Future ground truth (for evaluation, not an input)", t: T.future_t },
         ],
-        onPick: (hh) => { if (hh.p === 0) Insp.value(t, hh.i * 3, { note: `과거 ${hh.i}: t = ${ST.fmt(T.history_t[hh.i], 3)} s. 이웃 값이 y, z입니다.` }); },
+        onPick: (hh) => { if (hh.p === 0) Insp.value(t, hh.i * 3, { note: `Past ${hh.i}: t = ${ST.fmt(T.history_t[hh.i], 3)} s. The neighboring values are y and z.` }); },
       });
-      body.appendChild(U.note(`${esc(T.frame)}. 과거 16점(0.1 s 간격)은 프롬프트에서 45개의 이산 토큰(15구간 × dx, dy, dz)이 됩니다 → <a href="#" data-go="prompt">프롬프트 단계</a>.`, "small"));
+      body.appendChild(U.note(`${esc(T.frame)}. The 16 past points (0.1 s apart) become 45 discrete tokens in the prompt (15 intervals × dx, dy, dz) → <a href="#" data-go="prompt">prompt step</a>.`, "small"));
       body.querySelector("[data-go]").onclick = (ev) => { ev.preventDefault(); ctx.go("prompt"); };
-      const tv = h("details", { class: "small" }, h("summary", {}, "ego_history_xyz 값 표 (16 × 3)"));
+      const tv = h("details", { class: "small" }, h("summary", {}, "ego_history_xyz value table (16 × 3)"));
       body.appendChild(tv);
-      numTable(tv, t, { rows: 16, cols: 3, colLabels: ["x (전방)", "y (좌)", "z (위)"], rowLabels: T.history_t.map((x) => `${x.toFixed(1)} s`), fmt: (v) => v.toFixed(4) });
+      numTable(tv, t, { rows: 16, cols: 3, colLabels: ["x (forward)", "y (left)", "z (up)"], rowLabels: T.history_t.map((x) => `${x.toFixed(1)} s`), fmt: (v) => v.toFixed(4) });
     });
 
     // prompt preview
-    lazy(cards, ctx, "프롬프트 <span class='muted'>(토큰 4,580개)</span>", {}, async (body) => {
+    lazy(cards, ctx, "Prompt <span class='muted'>(4,580 tokens)</span>", {}, async (body) => {
       const im = L.images, nImg = im.length * 180;
       body.appendChild(U.kv([
-        ["전체 토큰", `${ST.fmt(L.L)}개 = 프리필 ${ST.fmt(L.prefill_len)} + 디코드 첫 입력 1`],
-        ["이미지 토큰", `${ST.fmt(nImg)}개 = 24장 × 180 (패치 720개를 2×2씩 병합)`],
-        ["텍스트·특수 토큰", `${ST.fmt(L.L - nImg)}개 (궤적 이력 45개 포함)`],
+        ["Total tokens", `${ST.fmt(L.L)} = prefill ${ST.fmt(L.prefill_len)} + first decode input 1`],
+        ["Image tokens", `${ST.fmt(nImg)} = 24 images × 180 (720 patches merged 2×2)`],
+        ["Text and special tokens", `${ST.fmt(L.L - nImg)} (including 45 trajectory-history tokens)`],
       ], "tight"));
       const pv = h("div", { class: "prompt-pv" });
       body.appendChild(pv);
@@ -565,51 +565,51 @@ const SG = (() => {
     });
 
     // pipeline
-    const pc = U.card("파이프라인 한눈에 보기", { wide: true, sub: "각 상자를 누르면 해당 단계로 이동합니다. 모델의 원본 설명은 아래 모델 카드와 원본 코드에 있습니다." });
+    const pc = U.card("Pipeline at a glance", { wide: true, sub: "Click a box to go to that step. The original description of the model is in the model card and the original code below." });
     cards.appendChild(pc);
     pipeline(pc.querySelector(".card-b"), ctx);
 
     // run info
-    const ri = U.card("실행 정보", {});
+    const ri = U.card("Run info", {});
     cards.appendChild(ri);
     const rb = ri.querySelector(".card-b");
     const S = M.settings, E = M.env, Ti = M.timings, St = M.stream, Pm = M.peak_memory;
     rb.appendChild(U.kv([
-      ["모델", `<span class="mono">${esc(S.model_id)}</span> (${esc(S.weights)})`],
-      ["샘플링", `seed ${S.seed} · top_p ${S.top_p} · temperature ${S.temperature} (LLM 토큰용) · 궤적 샘플 ${S.num_traj_samples}`],
-      ["확산", `플로 매칭 Euler ${S.diffusion_steps} 스텝 · 분류기 없는 가이던스 미사용`],
-      ["정밀도", esc(S.autocast)],
-      ["어텐션 구현", `vision ${esc(M.attn_implementation.vision)} · LLM ${esc(M.attn_implementation.llm)} · expert ${esc(M.attn_implementation.expert)}`],
-      ["GPU · 드라이버", `${esc(E.gpu)} · ${esc(E.driver)}`],
-      ["소프트웨어", `torch ${esc(E.torch)} · CUDA ${esc(E.cuda)} · cuDNN ${E.cudnn} · transformers ${esc(E.transformers)} · Python ${esc(E.python)}`],
-      ["시간", `구성 ${Ti.build_and_resident_s} s · 추론 ${Ti.inference_s} s · 궤적 디코드 ${Ti.flow_decode_s} s · 합계 ${Ti.total_s} s`],
-      ["레이어 스트리밍", `읽기 ${St.reader_gb} GB (${St.reader_gbps} GB/s) · prefetch 대기 ${St.prefetch_wait_s} s · H2D ${St.prefetch_h2d_s} s`],
-      ["최대 GPU 메모리", `할당 ${Pm.max_allocated_gib} GiB · 예약 ${Pm.max_reserved_gib} GiB`],
-      ["캡처 타임라인", M.capture_timeline.map(([n, s]) => `${esc(n)} ${s} s`).join(" → ")],
-      ["생성", esc(M.generated)],
+      ["Model", `<span class="mono">${esc(S.model_id)}</span> (${esc(S.weights)})`],
+      ["Sampling", `seed ${S.seed} · top_p ${S.top_p} · temperature ${S.temperature} (for LLM tokens) · trajectory samples ${S.num_traj_samples}`],
+      ["Diffusion", `flow matching, ${S.diffusion_steps} Euler steps · no classifier-free guidance`],
+      ["Precision", esc(S.autocast)],
+      ["Attention implementation", `vision ${esc(M.attn_implementation.vision)} · LLM ${esc(M.attn_implementation.llm)} · expert ${esc(M.attn_implementation.expert)}`],
+      ["GPU · driver", `${esc(E.gpu)} · ${esc(E.driver)}`],
+      ["Software", `torch ${esc(E.torch)} · CUDA ${esc(E.cuda)} · cuDNN ${E.cudnn} · transformers ${esc(E.transformers)} · Python ${esc(E.python)}`],
+      ["Time", `build ${Ti.build_and_resident_s} s · inference ${Ti.inference_s} s · trajectory decode ${Ti.flow_decode_s} s · total ${Ti.total_s} s`],
+      ["Layer streaming", `read ${St.reader_gb} GB (${St.reader_gbps} GB/s) · prefetch wait ${St.prefetch_wait_s} s · H2D ${St.prefetch_h2d_s} s`],
+      ["Peak GPU memory", `allocated ${Pm.max_allocated_gib} GiB · reserved ${Pm.max_reserved_gib} GiB`],
+      ["Capture timeline", M.capture_timeline.map(([n, s]) => `${esc(n)} ${s} s`).join(" → ")],
+      ["Generated", esc(M.generated)],
     ], "tight"));
-    rb.appendChild(h("p", { class: "note caveat", html: `<b>캐비앗</b> ${esc(M.caveat)}` }));
+    rb.appendChild(h("p", { class: "note caveat", html: `<b>Caveat</b> ${esc(M.caveat)}` }));
   }
 
   function showImage(ctx, k) {
     const c = D.camOf(k), L = D.L(), [a, b] = L.images[k];
-    Insp.html(`이미지 ${k} · ${c.title} 프레임 ${c.frame}`, () => {
+    Insp.html(`Image ${k} · ${c.title} frame ${c.frame}`, () => {
       const box = h("div", {});
-      const img = h("img", { src: D.F.img(`in_${pad2(k)}.png`), class: "insp-img", alt: `이미지 ${k}` });
+      const img = h("img", { src: D.F.img(`in_${pad2(k)}.png`), class: "insp-img", alt: `Image ${k}` });
       box.appendChild(img);
       box.appendChild(U.kv([
-        ["카메라", `${esc(c.title)} (<span class="mono">${esc(c.name)}</span>, id ${c.id})`],
-        ["프롬프트 머리말", esc(c.header)],
-        ["프레임", `${c.frame} · 상대 시각 +${c.t.toFixed(4)} s`],
-        ["모델 입력", "576 × 320 (전처리: /255 → (x − 0.5)/0.5)"],
-        ["패치", `20 × 36 = 720개 (16×16, 시간축 2장 동일) → pixel_values 행 ${ST.fmt(k * 720)}…${ST.fmt(k * 720 + 719)}`],
-        ["병합 토큰", `10 × 18 = 180개 → 프롬프트 위치 #${a}…#${b - 1}`],
-        ["경계 토큰", `&lt;|vision_start|&gt; #${L.vision_start[k]} · &lt;|vision_end|&gt; #${L.vision_end[k]}`],
-        k === L.focal_image ? ["초점 이미지", "비전 블록 27개의 모든 중간값(q, k, v, 어텐션 720×720, MLP)을 캡처"] : null,
+        ["Camera", `${esc(c.title)} (<span class="mono">${esc(c.name)}</span>, id ${c.id})`],
+        ["Prompt header", esc(c.header)],
+        ["Frame", `${c.frame} · relative time +${c.t.toFixed(4)} s`],
+        ["Model input", "576 × 320 (preprocessing: /255 → (x − 0.5)/0.5)"],
+        ["Patches", `20 × 36 = 720 (16×16, 2 identical frames along time) → pixel_values rows ${ST.fmt(k * 720)}…${ST.fmt(k * 720 + 719)}`],
+        ["Merged tokens", `10 × 18 = 180 → prompt positions #${a}…#${b - 1}`],
+        ["Boundary tokens", `&lt;|vision_start|&gt; #${L.vision_start[k]} · &lt;|vision_end|&gt; #${L.vision_end[k]}`],
+        k === L.focal_image ? ["Focal image", "Every intermediate of the 27 vision blocks captured (q, k, v, attention 720×720, MLP)"] : null,
       ], "tight"));
       box.appendChild(h("div", { class: "links" },
-        U.button("패치 만들기 보기 ▶", () => { ctx.setSel("img", k, false); ctx.go("patch"); }, ""),
-        U.button("프롬프트에서 보기", () => { ctx.setSel("pos", a, false); ctx.go("prompt"); }, "ghost")));
+        U.button("View patching ▶", () => { ctx.setSel("img", k, false); ctx.go("patch"); }, ""),
+        U.button("View in prompt", () => { ctx.setSel("pos", a, false); ctx.go("prompt"); }, "ghost")));
       return box;
     });
   }
@@ -623,7 +623,7 @@ const SG = (() => {
       if (imgAt.has(p)) {
         flush(buf);
         const k = imgAt.get(p), c = D.camOf(k), [a, b] = L.images[k];
-        const chip = h("button", { class: "pt-img", type: "button", style: { "--c": D.SLOT_COL[c.slot] } }, `이미지 ${k}: ${c.title} f${c.frame} · 180 토큰`);
+        const chip = h("button", { class: "pt-img", type: "button", style: { "--c": D.SLOT_COL[c.slot] } }, `Image ${k}: ${c.title} f${c.frame} · 180 tokens`);
         chip.onclick = () => showImage(ctx, k);
         pv.appendChild(chip);
         p = b;
@@ -631,7 +631,7 @@ const SG = (() => {
       }
       if (p === L.history_start + 1) {
         flush(buf);
-        const chip = h("button", { class: "pt-hist", type: "button" }, `궤적 이력 45 토큰 (15 × dx, dy, dz)`);
+        const chip = h("button", { class: "pt-hist", type: "button" }, `Trajectory history · 45 tokens (15 × dx, dy, dz)`);
         chip.onclick = () => { ctx.setSel("pos", L.history_start + 1, false); ctx.go("prompt"); };
         pv.appendChild(chip);
         p = L.history_end;
@@ -658,32 +658,32 @@ const SG = (() => {
     const G = (id) => GROUPS.find((g) => g.id === id);
     const cf = D.M.config;
     row.append(
-      box(G("in"), ["카메라 6 × 4프레임", "과거 궤적 16점"], "scene"),
-      box(G("vis"), ["패치 임베딩 → +pos", `ViT 블록 ${cf.vision.depth}개 (${cf.vision.hidden_size}차원)`, "병합기 → 5120 · 딥스택 3"], "patch"),
-      box(G("pre"), [`프롬프트 ${ST.fmt(D.L().prefill_len)} 토큰`, `디코더 ${cf.text.num_hidden_layers}층 (${cf.text.hidden_size}차원)`], "prompt"),
-      box(G("dec"), [`CoT ${D.M.counts.decode_steps} 스텝`, "top-p 샘플링"], "decode"),
-      box(G("exp"), [`플로 매칭 ${D.M.counts.expert_steps} 스텝`, `전문가 ${cf.expert.num_hidden_layers}층 (${cf.expert.hidden_size}차원)`], "esetup"),
-      box(G("out"), ["궤적 64점 · 6.4 s", "ADE / FDE"], "result"));
+      box(G("in"), ["6 cameras × 4 frames", "16 past trajectory points"], "scene"),
+      box(G("vis"), ["Patch embedding → +pos", `${cf.vision.depth} ViT blocks (${cf.vision.hidden_size}-dim)`, "Merger → 5120 · DeepStack ×3"], "patch"),
+      box(G("pre"), [`${ST.fmt(D.L().prefill_len)} prompt tokens`, `${cf.text.num_hidden_layers} decoder layers (${cf.text.hidden_size}-dim)`], "prompt"),
+      box(G("dec"), [`${D.M.counts.decode_steps} CoT steps`, "top-p sampling"], "decode"),
+      box(G("exp"), [`${D.M.counts.expert_steps} flow matching steps`, `${cf.expert.num_hidden_layers} expert layers (${cf.expert.hidden_size}-dim)`], "esetup"),
+      box(G("out"), ["64 trajectory points · 6.4 s", "ADE / FDE"], "result"));
     parent.appendChild(row);
     parent.appendChild(h("div", { class: "links" },
       ...LINKS.map((l) => h("a", { class: "btn", href: l.href, target: "_blank", rel: "noopener", title: l.title }, `${l.label} ↗`))));
   }
 
-  reg("scene", { title: () => "입력 장면", render: renderScene });
+  reg("scene", { title: () => "Input scene", render: renderScene });
 
   // ================================================================ stage: result
   function renderResult(el, ctx) {
     const M = D.M, T = D.T, pal = M.plot.palette, fl = T.flow;
     const cards = head(el, {
-      kind: "result", kicker: "결과",
-      title: "예측 궤적 — 64 웨이포인트, 6.4초",
-      desc: `행동 전문가가 10번의 Euler 스텝으로 만든 행동(가속도·곡률)을 유니사이클 모델로 적분한 궤적입니다. ` +
-        `CoT: <b>“${esc(M.cot[0])}”</b>. minADE ${M.metrics.minADE.toFixed(4)} m · minFDE ${M.metrics.minFDE.toFixed(4)} m (이 실행의 값, 상대 비교용).`,
-      badges: [check("traj.final_flow_state_decodes_to_pred", "마지막 플로 상태 → 예측 궤적"), check("traj.ade_fde_match_notebook_plot", "ADE/FDE = 노트북 그림")],
+      kind: "result", kicker: "Result",
+      title: "Predicted trajectory — 64 waypoints, 6.4 s",
+      desc: `The action expert makes actions (acceleration and curvature) in 10 Euler steps, and a unicycle model integrates them into this trajectory. ` +
+        `CoT: <b>“${esc(M.cot[0])}”</b>. minADE ${M.metrics.minADE.toFixed(4)} m · minFDE ${M.metrics.minFDE.toFixed(4)} m (values from this run, for relative comparison).`,
+      badges: [check("traj.final_flow_state_decodes_to_pred", "Last flow state → predicted trajectory"), check("traj.ade_fde_match_notebook_plot", "ADE/FDE = notebook plot")],
     });
 
     // BEV with flow states
-    lazy(cards, ctx, "BEV: 과거 · 정답 · 예측 <span class='muted'>(+ 플로 상태)</span>", { wide: true }, async (body) => {
+    lazy(cards, ctx, "BEV: past · ground truth · predicted <span class='muted'>(+ flow state)</span>", { wide: true }, async (body) => {
       const pred = await ctx.read(D.F.etraj, "pred_xyz");
       const tools = h("div", { class: "row-tools" });
       body.appendChild(tools);
@@ -699,23 +699,23 @@ const SG = (() => {
         Charts.bev(cv, {
           W: U.width(body, 640), H: 420, egoColor: pal.ego, latX: ctx.sel.bevx,
           paths: [
-            { pts: T.history_xyz, color: pal.history, width: 2, label: "과거", t: T.history_t },
-            { pts: T.gt_xyz, color: pal.ground_truth, width: 2, dash: [6, 4], label: "정답", t: T.future_t },
+            { pts: T.history_xyz, color: pal.history, width: 2, label: "Past", t: T.history_t },
+            { pts: T.gt_xyz, color: pal.ground_truth, width: 2, dash: [6, 4], label: "Ground truth", t: T.future_t },
             { pts: st, color: hat ? (Charts.css("--est") || "#8A5A00") : (Charts.css("--muted") || "#888"), width: 1.5, alpha: 0.9, dots: 1.5,
-              label: hat ? `x̂₁ 추정 (스텝 ${kk})` : `x_${kk} 디코드`, t: T.future_t, noFit: true },
-            { pts: T.pred_xyz, color: pal.prediction, width: 2.5, label: "예측", t: T.future_t },
+              label: hat ? `x̂₁ estimate (step ${kk})` : `x_${kk} decoded`, t: T.future_t, noFit: true },
+            { pts: T.pred_xyz, color: pal.prediction, width: 2.5, label: "Predicted", t: T.future_t },
           ],
-          onPick: (hh) => { if (hh.p === 3) Insp.value(pred, hh.i * 3, { note: `예측 웨이포인트 ${hh.i}: t = +${ST.fmt(T.future_t[hh.i], 3)} s (이웃 값이 y, z)` }); },
+          onPick: (hh) => { if (hh.p === 3) Insp.value(pred, hh.i * 3, { note: `Predicted waypoint ${hh.i}: t = +${ST.fmt(T.future_t[hh.i], 3)} s (the neighboring values are y and z)` }); },
         });
-        info.innerHTML = `${hat ? `x̂₁ = x_k + (1 − t_k)·v_k <b>(추정: 직선 경로 가정)</b>, k = ${kk}` : `x_${kk}: t = ${ST.fmt(fl.t[kk], 2)} 의 플로 상태를 그대로 궤적으로 디코드`} → ADE ${met[0].toFixed(3)} m · FDE ${met[1].toFixed(3)} m`;
+        info.innerHTML = `${hat ? `x̂₁ = x_k + (1 − t_k)·v_k <b>(estimate: assumes a straight path)</b>, k = ${kk}` : `x_${kk}: the flow state at t = ${ST.fmt(fl.t[kk], 2)}, decoded as a trajectory as is`} → ADE ${met[0].toFixed(3)} m · FDE ${met[1].toFixed(3)} m`;
       };
       tools.append(
-        U.seg([["x", "플로 상태 x_k"], ["hat", "x̂₁ 추정"]], ctx.sel.fmode, (v) => { ctx.setSel("fmode", v, false); draw(); }),
+        U.seg([["x", "Flow state x_k"], ["hat", "x̂₁ estimate"]], ctx.sel.fmode, (v) => { ctx.setSel("fmode", v, false); draw(); }),
         U.slider(0, 10, ctx.sel.fk, (v) => { ctx.setSel("fk", v, false); draw(); }, { label: "k", fmt: (v) => String(v) }),
         bevScale(ctx, draw, ""));
       draw();
-      body.appendChild(U.note("x₀ ~ N(0, 1)에서 시작해 x₁₀이 최종 행동입니다. x_k를 궤적으로 디코드하면 노이즈에서 궤적이 드러나는 과정이 보이고, x̂₁은 각 스텝에서 “지금 속도로 끝까지 가면” 도달할 추정값입니다. " +
-        "1:1에서는 앞으로 가는 거리에 비해 옆 방향 움직임이 작아 궤적이 거의 직선으로 보일 수 있습니다. 옆 방향 차이는 가로 확대(×5 · ×20)에서 봅니다.", "small"));
+      body.appendChild(U.note("Starting from x₀ ~ N(0, 1), the flow ends at x₁₀, the final action. Decoding x_k as a trajectory shows the trajectory emerging from the noise, and x̂₁ is the estimate of where each step would arrive “if it kept its current velocity to the end”. " +
+        "At 1:1 the sideways motion is small compared with the forward distance, so the trajectory can look almost straight. See lateral differences with the horizontal zoom (×5 · ×20).", "small"));
     });
 
     // metrics
@@ -725,17 +725,17 @@ const SG = (() => {
     mb.appendChild(U.kv([
       ["minADE", `${T.pred_metrics.ade.toFixed(6)} m <span class="muted">(float64 · manifest float32 ${M.metrics.minADE})</span>`],
       ["minFDE", `${T.pred_metrics.fde.toFixed(6)} m <span class="muted">(float64 · manifest float32 ${M.metrics.minFDE})</span>`],
-      ["정의", "ADE = 64개 웨이포인트 xy 거리 평균, FDE = 6.4 s 지점 거리 (궤적 샘플 1개라 min = 그 값)"],
+      ["Definition", "ADE = mean xy distance over the 64 waypoints, FDE = distance at 6.4 s (one trajectory sample, so min = that value)"],
     ], "tight"));
     const mt = [];
     for (let k = 0; k <= 10; k++) mt.push([`x_${k}`, fl.metrics_x[k][0].toFixed(3), fl.metrics_x[k][1].toFixed(3), k < 10 ? fl.metrics_hat[k][0].toFixed(3) : "–", k < 10 ? fl.metrics_hat[k][1].toFixed(3) : "–"]);
-    mb.appendChild(U.table(["상태", "ADE x_k", "FDE x_k", "ADE x̂₁ (추정)", "FDE x̂₁ (추정)"], mt, {
+    mb.appendChild(U.table(["State", "ADE x_k", "FDE x_k", "ADE x̂₁ (estimate)", "FDE x̂₁ (estimate)"], mt, {
       cls: "small", sel: ctx.sel.fk, onRow: (i) => { ctx.setSel("fk", i); } }));
     mb.appendChild(h("p", { class: "note caveat small", html: esc(M.caveat) }));
 
     // camera projections
-    const pc = U.card("카메라 투영 <span class='muted'>(t0 프레임, 리본 폭 " + T.ribbon_width_m + " m)</span>", { wide: true,
-      sub: "궤적을 카메라 좌표로 투영해 원본 해상도(1920×1080) 영상 위에 그립니다. 초록 = 예측, 분홍 = 정답. 아래에서 플로 상태나 v-렌즈(추정)를 겹쳐 볼 수 있습니다." });
+    const pc = U.card("Camera projection <span class='muted'>(t0 frame, ribbon width " + T.ribbon_width_m + " m)</span>", { wide: true,
+      sub: "The trajectory is projected into camera coordinates and drawn over the full-resolution (1920×1080) image. Green = predicted, pink = ground truth. Below, you can overlay a flow state or the v-lens (estimate)." });
     cards.appendChild(pc);
     const pb = pc.querySelector(".card-b");
     const ptools = h("div", { class: "row-tools" });
@@ -748,13 +748,13 @@ const SG = (() => {
       for (const cam of Object.keys(T.projection)) projCanvas(pwrap, cam, ctx, overlays);
     };
     ptools.append(
-      U.seg([[false, "플로 상태 끄기"], [true, "플로 상태 겹치기"]], overlays.flow, (v) => { overlays.flow = v; drawProj(); }),
+      U.seg([[false, "Hide flow state"], [true, "Overlay flow state"]], overlays.flow, (v) => { overlays.flow = v; drawProj(); }),
       U.slider(-1, 63, overlays.vl, (v, fin) => { overlays.vl = v; if (fin) { ctx.setSel("vlayer", v, false); } drawProj(); },
-        { label: "v-렌즈 층 (front wide, 추정)", fmt: (v) => (v < 0 ? "끔" : `L${v}`) }));
+        { label: "v-lens layer (front wide, estimate)", fmt: (v) => (v < 0 ? "off" : `L${v}`) }));
     drawProj();
 
     // CoT
-    const cc = U.card("사고 사슬 (CoT)", {});
+    const cc = U.card("Chain of thought (CoT)", {});
     cards.appendChild(cc);
     const cbx = cc.querySelector(".card-b");
     const g = M.generation;
@@ -762,21 +762,21 @@ const SG = (() => {
     const chips = h("div", { class: "chips" });
     g.final.forEach((id, s) => {
       const st = g.steps[s];
-      chips.appendChild(tokChip(id, { title: `디코드 스텝 ${s} · p = ${st ? ST.fmt(st.p_output, 4) : "–"}`, onClick: () => ctx.go("decode", s) }));
+      chips.appendChild(tokChip(id, { title: `Decode step ${s} · p = ${st ? ST.fmt(st.p_output, 4) : "–"}`, onClick: () => ctx.go("decode", s) }));
     });
     cbx.appendChild(chips);
-    cbx.appendChild(U.note(`생성 토큰 12개 + EOS(<span class="mono">&lt;|traj_future_start|&gt;</span>) 뒤에 뽑힌 1개는 pad로 바뀝니다. 토큰을 누르면 그 디코드 스텝으로 갑니다.`, "small"));
+    cbx.appendChild(U.note(`12 generated tokens + EOS (<span class="mono">&lt;|traj_future_start|&gt;</span>). The one token sampled after EOS becomes pad. Click a token to go to its decode step.`, "small"));
 
     // notebook png
-    const nc = U.card("노트북 출력 그림", { sub: "노트북이 저장한 그림 그대로입니다 (검사 traj.ade_fde_match_notebook_plot)." });
+    const nc = U.card("Notebook output plot", { sub: "The plot exactly as the notebook saved it (check traj.ade_fde_match_notebook_plot)." });
     cards.appendChild(nc);
     nc.querySelector(".card-b").appendChild(h("img", { src: D.F.res(M.plot.png), class: "nb-png", alt: "notebook plot", loading: "lazy" }));
 
     // checks
-    const kc = U.card(`검증 ${Object.keys(M.checks).length}개`, { wide: true, sub: "analyze.py가 캡처 파일만으로 다시 계산해 확인한 항목입니다. 행을 누르면 세부 값이 나옵니다. 브라우저에서 직접 다시 계산하는 검사는 분석 → 검증 탭에 있습니다." });
+    const kc = U.card(`Checks (${Object.keys(M.checks).length})`, { wide: true, sub: "analyze.py recomputed these items from the capture files alone to check them. Click a row to see its details. Checks that recompute in the browser are in the Analysis tools → Checks tab." });
     cards.appendChild(kc);
     const names = Object.keys(M.checks);
-    kc.querySelector(".card-b").appendChild(U.table(["검사", "결과", "세부"], names.map((n) => {
+    kc.querySelector(".card-b").appendChild(U.table(["Check", "Result", "Details"], names.map((n) => {
       const c = M.checks[n], rest = Object.entries(c).filter(([k]) => k !== "ok" && k !== "note");
       return [`<span class="mono">${esc(n)}</span>`, c.ok ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>',
         `<span class="small muted">${esc(rest.map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ").slice(0, 160))}</span>`];
@@ -793,7 +793,7 @@ const SG = (() => {
     const cv = U.canvas();
     fig.appendChild(cv);
     const c = D.cams();
-    fig.appendChild(h("figcaption", { class: "small muted" }, `${c.titles[P.slot]} (id ${P.camera_id}) · 프레임 3`));
+    fig.appendChild(h("figcaption", { class: "small muted" }, `${c.titles[P.slot]} (id ${P.camera_id}) · frame 3`));
     const img = image(D.DER + P.image);
     const k = ctx.sel.fk, hat = ctx.sel.fmode === "hat";
     const draw = () => {
@@ -820,14 +820,14 @@ const SG = (() => {
         for (const r of runs) { poly(r, false); g.stroke(); }
         g.setLineDash([]);
         g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(6, 6, 250, 18);
-        g.fillStyle = "#fff"; g.fillText(`v-렌즈 추정: 플로 스텝 ${kk}, 전문가 층 ${ov.vl}`, 10, 15);
+        g.fillStyle = "#fff"; g.fillText(`v-lens estimate: flow step ${kk}, L${ov.vl}`, 10, 15);
       }
     };
     if (!(img.complete && img.naturalWidth)) img.addEventListener("load", draw, { once: true });
     draw();
   }
 
-  reg("result", { title: () => "예측 궤적", render: renderResult });
+  reg("result", { title: () => "Predicted trajectory", render: renderResult });
 
   return {
     REG, STALE, ORDER, SPLIT, SUBKEY, SUBS, GROUPS, LINKS, SEL, SEL_DEF, RECOMP, R,

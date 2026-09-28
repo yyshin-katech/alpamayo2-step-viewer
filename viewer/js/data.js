@@ -188,11 +188,11 @@ const D = (() => {
   const gridM = (g) => mergedAt(Math.floor(g / 18), g % 18);
 
   // ---------------------------------------------------------------- bins
-  const BIN_KO = { text_pre_history: "텍스트(이력 앞)", history: "궤적 이력", text_post_history: "텍스트(이력 뒤)", generated: "생성 토큰", expert_self: "전문가 자기" };
+  const BIN_KO = { text_pre_history: "Text (before history)", history: "Trajectory history", text_post_history: "Text (after history)", generated: "Generated tokens", expert_self: "Expert self" };
   function binName(b) {
     const n = L().bins[b];
     if (!n) return `bin ${b}`;
-    if (n.startsWith("image")) { const k = +n.slice(5), c = camOf(k); return `이미지 ${k} (${c.title} f${c.frame})`; }
+    if (n.startsWith("image")) { const k = +n.slice(5), c = camOf(k); return `Image ${k} (${c.title} f${c.frame})`; }
     return BIN_KO[n] || n;
   }
   function binShort(b) {
@@ -218,13 +218,13 @@ const D = (() => {
   /** One-line description of a prompt position. */
   function posLabel(pos) {
     const im = imageOf(pos);
-    if (im) { const c = camOf(im.k); return `#${pos} 이미지 ${im.k} (${c.title} f${c.frame}) 토큰 ${im.m} · (${im.br},${im.bc})`; }
+    if (im) { const c = camOf(im.k); return `#${pos} image ${im.k} (${c.title} f${c.frame}) token ${im.m} · (${im.br},${im.bc})`; }
     if (pos < S.tokens.length) return `#${pos} ${pretty(S.tokens[pos])} · ${binName(bin(pos))}`;
     if (pos < kvLen()) {
       const s = pos - S.tokens.length, id = S.M.generation.final[s];
-      return `#${pos} 생성 토큰 ${s} ${tokText(id)} (id ${id})`;
+      return `#${pos} generated token ${s} ${tokText(id)} (id ${id})`;
     }
-    return `#${pos} 전문가 웨이포인트 토큰 ${pos - kvLen()}`;
+    return `#${pos} expert waypoint token ${pos - kvLen()}`;
   }
 
   /** M-RoPE (t, h, w) for a prefill position. */

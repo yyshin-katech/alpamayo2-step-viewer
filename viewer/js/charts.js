@@ -575,7 +575,7 @@ const Charts = (() => {
       if (ex > 1) ctx.fillText(`${parseFloat(y.toPrecision(6))} m`, sx(y), H - 4);
     }
     ctx.textAlign = "left";
-    if (ex > 1) { ctx.fillStyle = css("--est"); ctx.fillText(`가로 ×${ex} (y축만 확대, 왼쪽 = +y)`, 3, H - 16); }
+    if (ex > 1) { ctx.fillStyle = css("--est"); ctx.fillText(`Horizontal ×${ex} (y axis only, left = +y)`, 3, H - 16); }
     // ego box at origin (x forward); drawn at true aspect even when y is exaggerated
     ctx.fillStyle = o.egoColor || "#EE7733";
     ctx.save(); ctx.translate(sx(0), sy(0));
