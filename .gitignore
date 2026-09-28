@@ -1,0 +1,42 @@
+# Never commit data, screenshots or logs.  Everything under walk/out, every camera frame and every
+# screenshot of the viewer comes from the PhysicalAI-AV dataset, whose license forbids sharing it
+# in whole or in part (docs/model-and-data.md).  `git add -f` gets past these rules: don't.
+
+# data, captures, analysis, results
+/walk/out/
+*.pt
+*.safetensors
+*.parquet
+*.mp4
+*.pdf
+/*.json
+selftest*.json
+
+# screenshots and recordings
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.webm
+
+# logs
+/logs/
+*.log
+
+# Hugging Face caches, should HF_HOME / HF_HUB_CACHE / --local-dir ever point inside the
+# repository (keep them outside; this is only a safety net)
+models--*/
+datasets--*/
+/.cache/
+xet/
+token
+stored_tokens
+
+# local environment: upstream clone, venv, uv, Chrome profiles, bytecode
+/alpamayo2/
+/.venv/
+/tools/
+chrome-prof-*/
+__pycache__/
+*.pyc

@@ -1,0 +1,23 @@
+alpamayo2-step-viewer
+Copyright 2026 The alpamayo2-step-viewer authors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository contains code and documentation only.  It contains no model weights, no
+dataset files and nothing derived from them (captures, camera frames, images, screenshots,
+logs or results).
+
+walk/ follows the inference notebook and package of NVlabs/alpamayo2
+(https://github.com/NVlabs/alpamayo2; Apache-2.0; Copyright (c) 2026 NVIDIA CORPORATION &
+AFFILIATES) and reproduces the model construction steps of Hugging Face transformers'
+from_pretrained (https://github.com/huggingface/transformers; Apache-2.0).  It imports the
+alpamayo2_super package at run time; no source file of that package is included here.
+
+Material you download yourself stays under its own terms:
+  - nvidia/Alpamayo2-Super model weights: OpenMDW License 1.1.
+  - nvidia/PhysicalAI-Autonomous-Vehicles dataset: NVIDIA Autonomous Vehicle Dataset License
+    Agreement.  Among other things it forbids distributing or hosting the dataset in whole or
+    in part, and treats results and performance data relating to the dataset as confidential.
+See docs/model-and-data.md.
+
+This is not an official NVIDIA project and is not endorsed by NVIDIA.

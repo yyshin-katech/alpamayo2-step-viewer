@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpamayo 2 단계 뷰어</title>
+<meta name="description" content="Alpamayo 2 Super가 노트북 샘플 0을 처리하는 과정을 캡처한 텐서로 한 단계씩 보여 주는 로컬 뷰어">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230E8486'/%3E%3Cpath d='M3 12 L8 3 L13 12 Z' fill='none' stroke='white' stroke-width='1.6'/%3E%3C/svg%3E">
+<script>
+  try { const t = localStorage.getItem("aw.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
+</script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><b>Alpamayo 2 Super</b> 단계별 뷰어 <span class="muted">· 노트북 샘플 0</span></div>
+  <nav id="nav" aria-label="단계 이동"></nav>
+  <div id="tools"></div>
+</header>
+<div id="groupbar" aria-label="구간"></div>
+<main id="main">
+  <div id="stage"><div id="stage-in"><div class="wait">불러오는 중…</div></div></div>
+  <aside id="insp" aria-label="인스펙터"></aside>
+</main>
+<div id="drawer" class="drawer" aria-label="분석 도구"></div>
+<noscript><p class="fatal">이 뷰어는 자바스크립트가 필요합니다.</p></noscript>
+
+<script src="js/st.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/data.js"></script>
+<script src="js/inspector.js"></script>
+<script src="js/stages.js"></script>
+<script src="js/st_vision.js"></script>
+<script src="js/st_vblock.js"></script>
+<script src="js/st_llm.js"></script>
+<script src="js/st_llayer.js"></script>
+<script src="js/st_decode.js"></script>
+<script src="js/st_expert.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/an_stats.js"></script>
+<script src="js/an_tools.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
